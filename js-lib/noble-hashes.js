@@ -54,56 +54,70 @@ var nobleHashes = (() => {
     sha512: () => sha512,
     sha512_224: () => sha512_224,
     sha512_256: () => sha512_256,
+    shake128: () => shake128,
+    shake256: () => shake256,
     turboshake128: () => turboshake128,
     turboshake256: () => turboshake256,
     utils: () => utils
   });
 
-  // ../src/crypto.ts
+  // ../../src/crypto.ts
   var crypto = typeof globalThis === "object" && "crypto" in globalThis ? globalThis.crypto : void 0;
 
-  // ../esm/_assert.js
-  function number(n) {
+  // ../../esm/_assert.js
+  function anumber(n) {
     if (!Number.isSafeInteger(n) || n < 0)
-      throw new Error(`positive integer expected, not ${n}`);
+      throw new Error("positive integer expected, got " + n);
   }
   function isBytes(a) {
-    return a instanceof Uint8Array || a != null && typeof a === "object" && a.constructor.name === "Uint8Array";
+    return a instanceof Uint8Array || ArrayBuffer.isView(a) && a.constructor.name === "Uint8Array";
   }
-  function bytes(b, ...lengths) {
+  function abytes(b, ...lengths) {
     if (!isBytes(b))
       throw new Error("Uint8Array expected");
     if (lengths.length > 0 && !lengths.includes(b.length))
-      throw new Error(`Uint8Array expected of length ${lengths}, not of length=${b.length}`);
+      throw new Error("Uint8Array expected of length " + lengths + ", got length=" + b.length);
   }
-  function hash(h) {
+  function ahash(h) {
     if (typeof h !== "function" || typeof h.create !== "function")
       throw new Error("Hash should be wrapped by utils.wrapConstructor");
-    number(h.outputLen);
-    number(h.blockLen);
+    anumber(h.outputLen);
+    anumber(h.blockLen);
   }
-  function exists(instance, checkFinished = true) {
+  function aexists(instance, checkFinished = true) {
     if (instance.destroyed)
       throw new Error("Hash instance has been destroyed");
     if (checkFinished && instance.finished)
       throw new Error("Hash#digest() has already been called");
   }
-  function output(out, instance) {
-    bytes(out);
+  function aoutput(out, instance) {
+    abytes(out);
     const min = instance.outputLen;
     if (out.length < min) {
-      throw new Error(`digestInto() expects output buffer of length at least ${min}`);
+      throw new Error("digestInto() expects output buffer of length at least " + min);
     }
   }
 
-  // ../esm/utils.js
-  var u8 = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
-  var u32 = (arr) => new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
-  var createView = (arr) => new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
-  var rotr = (word, shift) => word << 32 - shift | word >>> shift;
-  var rotl = (word, shift) => word << shift | word >>> 32 - shift >>> 0;
-  var isLE = new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68;
-  var byteSwap = (word) => word << 24 & 4278190080 | word << 8 & 16711680 | word >>> 8 & 65280 | word >>> 24 & 255;
+  // ../../esm/utils.js
+  function u8(arr) {
+    return new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
+  }
+  function u32(arr) {
+    return new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
+  }
+  function createView(arr) {
+    return new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
+  }
+  function rotr(word, shift) {
+    return word << 32 - shift | word >>> shift;
+  }
+  function rotl(word, shift) {
+    return word << shift | word >>> 32 - shift >>> 0;
+  }
+  var isLE = /* @__PURE__ */ (() => new Uint8Array(new Uint32Array([287454020]).buffer)[0] === 68)();
+  function byteSwap(word) {
+    return word << 24 & 4278190080 | word << 8 & 16711680 | word >>> 8 & 65280 | word >>> 24 & 255;
+  }
   var byteSwapIfBE = isLE ? (n) => n : (n) => byteSwap(n);
   function byteSwap32(arr) {
     for (let i = 0; i < arr.length; i++) {
@@ -111,22 +125,22 @@ var nobleHashes = (() => {
     }
   }
   var hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
-  function bytesToHex(bytes2) {
-    bytes(bytes2);
+  function bytesToHex(bytes) {
+    abytes(bytes);
     let hex = "";
-    for (let i = 0; i < bytes2.length; i++) {
-      hex += hexes[bytes2[i]];
+    for (let i = 0; i < bytes.length; i++) {
+      hex += hexes[bytes[i]];
     }
     return hex;
   }
-  var asciis = { _0: 48, _9: 57, _A: 65, _F: 70, _a: 97, _f: 102 };
-  function asciiToBase16(char) {
-    if (char >= asciis._0 && char <= asciis._9)
-      return char - asciis._0;
-    if (char >= asciis._A && char <= asciis._F)
-      return char - (asciis._A - 10);
-    if (char >= asciis._a && char <= asciis._f)
-      return char - (asciis._a - 10);
+  var asciis = { _0: 48, _9: 57, A: 65, F: 70, a: 97, f: 102 };
+  function asciiToBase16(ch) {
+    if (ch >= asciis._0 && ch <= asciis._9)
+      return ch - asciis._0;
+    if (ch >= asciis.A && ch <= asciis.F)
+      return ch - (asciis.A - 10);
+    if (ch >= asciis.a && ch <= asciis.f)
+      return ch - (asciis.a - 10);
     return;
   }
   function hexToBytes(hex) {
@@ -135,7 +149,7 @@ var nobleHashes = (() => {
     const hl = hex.length;
     const al = hl / 2;
     if (hl % 2)
-      throw new Error("padded hex string expected, got unpadded hex of length " + hl);
+      throw new Error("hex string expected, got unpadded hex of length " + hl);
     const array = new Uint8Array(al);
     for (let ai = 0, hi = 0; ai < al; ai++, hi += 2) {
       const n1 = asciiToBase16(hex.charCodeAt(hi));
@@ -163,20 +177,20 @@ var nobleHashes = (() => {
   }
   function utf8ToBytes(str) {
     if (typeof str !== "string")
-      throw new Error(`utf8ToBytes expected string, got ${typeof str}`);
+      throw new Error("utf8ToBytes expected string, got " + typeof str);
     return new Uint8Array(new TextEncoder().encode(str));
   }
   function toBytes(data) {
     if (typeof data === "string")
       data = utf8ToBytes(data);
-    bytes(data);
+    abytes(data);
     return data;
   }
   function concatBytes(...arrays) {
     let sum = 0;
     for (let i = 0; i < arrays.length; i++) {
       const a = arrays[i];
-      bytes(a);
+      abytes(a);
       sum += a.length;
     }
     const res = new Uint8Array(sum);
@@ -193,9 +207,8 @@ var nobleHashes = (() => {
       return this._cloneInto();
     }
   };
-  var toStr = {}.toString;
   function checkOpts(defaults, opts) {
-    if (opts !== void 0 && toStr.call(opts) !== "[object Object]")
+    if (opts !== void 0 && {}.toString.call(opts) !== "[object Object]")
       throw new Error("Options should be object or undefined");
     const merged = Object.assign(defaults, opts);
     return merged;
@@ -234,7 +247,7 @@ var nobleHashes = (() => {
     throw new Error("crypto.getRandomValues must be defined");
   }
 
-  // ../esm/_blake.js
+  // ../../esm/_blake.js
   var SIGMA = /* @__PURE__ */ new Uint8Array([
     0,
     1,
@@ -427,7 +440,72 @@ var nobleHashes = (() => {
     11,
     7,
     5,
-    3
+    3,
+    // Blake1, unused in others
+    11,
+    8,
+    12,
+    0,
+    5,
+    2,
+    15,
+    13,
+    10,
+    14,
+    3,
+    6,
+    7,
+    1,
+    9,
+    4,
+    7,
+    9,
+    3,
+    1,
+    13,
+    12,
+    11,
+    14,
+    2,
+    6,
+    5,
+    10,
+    4,
+    0,
+    15,
+    8,
+    9,
+    0,
+    5,
+    7,
+    2,
+    4,
+    10,
+    15,
+    14,
+    1,
+    11,
+    12,
+    6,
+    8,
+    3,
+    13,
+    2,
+    12,
+    6,
+    10,
+    0,
+    11,
+    8,
+    3,
+    4,
+    13,
+    7,
+    5,
+    15,
+    14,
+    1,
+    9
   ]);
   var BLAKE = class extends Hash {
     constructor(blockLen, outputLen, opts = {}, keyLen, saltLen, persLen) {
@@ -438,21 +516,22 @@ var nobleHashes = (() => {
       this.pos = 0;
       this.finished = false;
       this.destroyed = false;
-      number(blockLen);
-      number(outputLen);
-      number(keyLen);
+      anumber(blockLen);
+      anumber(outputLen);
+      anumber(keyLen);
       if (outputLen < 0 || outputLen > keyLen)
         throw new Error("outputLen bigger than keyLen");
       if (opts.key !== void 0 && (opts.key.length < 1 || opts.key.length > keyLen))
-        throw new Error(`key must be up 1..${keyLen} byte long or undefined`);
+        throw new Error("key length must be undefined or 1.." + keyLen);
       if (opts.salt !== void 0 && opts.salt.length !== saltLen)
-        throw new Error(`salt must be ${saltLen} byte long or undefined`);
+        throw new Error("salt must be undefined or " + saltLen);
       if (opts.personalization !== void 0 && opts.personalization.length !== persLen)
-        throw new Error(`personalization must be ${persLen} byte long or undefined`);
-      this.buffer32 = u32(this.buffer = new Uint8Array(blockLen));
+        throw new Error("personalization must be undefined or " + persLen);
+      this.buffer = new Uint8Array(blockLen);
+      this.buffer32 = u32(this.buffer);
     }
     update(data) {
-      exists(this);
+      aexists(this);
       const { blockLen, buffer, buffer32 } = this;
       data = toBytes(data);
       const len = data.length;
@@ -489,8 +568,8 @@ var nobleHashes = (() => {
       return this;
     }
     digestInto(out) {
-      exists(this);
-      output(out, this);
+      aexists(this);
+      aoutput(out, this);
       const { pos, buffer32 } = this;
       this.finished = true;
       this.buffer.subarray(pos).fill(0);
@@ -523,7 +602,7 @@ var nobleHashes = (() => {
     }
   };
 
-  // ../esm/_u64.js
+  // ../../esm/_u64.js
   var U32_MASK64 = /* @__PURE__ */ BigInt(2 ** 32 - 1);
   var _32n = /* @__PURE__ */ BigInt(32);
   function fromBig(n, le = false) {
@@ -589,7 +668,7 @@ var nobleHashes = (() => {
   };
   var u64_default = u64;
 
-  // ../esm/blake2b.js
+  // ../../esm/blake2b.js
   var B2B_IV = /* @__PURE__ */ new Uint32Array([
     4089235720,
     1779033703,
@@ -768,7 +847,7 @@ var nobleHashes = (() => {
   };
   var blake2b = /* @__PURE__ */ wrapConstructorWithOpts((opts) => new BLAKE2b(opts));
 
-  // ../esm/blake2s.js
+  // ../../esm/blake2s.js
   var B2S_IV = /* @__PURE__ */ new Uint32Array([
     1779033703,
     3144134277,
@@ -879,7 +958,17 @@ var nobleHashes = (() => {
   };
   var blake2s = /* @__PURE__ */ wrapConstructorWithOpts((opts) => new BLAKE2s(opts));
 
-  // ../esm/blake3.js
+  // ../../esm/blake3.js
+  var B3_Flags;
+  (function(B3_Flags2) {
+    B3_Flags2[B3_Flags2["CHUNK_START"] = 1] = "CHUNK_START";
+    B3_Flags2[B3_Flags2["CHUNK_END"] = 2] = "CHUNK_END";
+    B3_Flags2[B3_Flags2["PARENT"] = 4] = "PARENT";
+    B3_Flags2[B3_Flags2["ROOT"] = 8] = "ROOT";
+    B3_Flags2[B3_Flags2["KEYED_HASH"] = 16] = "KEYED_HASH";
+    B3_Flags2[B3_Flags2["DERIVE_KEY_CONTEXT"] = 32] = "DERIVE_KEY_CONTEXT";
+    B3_Flags2[B3_Flags2["DERIVE_KEY_MATERIAL"] = 64] = "DERIVE_KEY_MATERIAL";
+  })(B3_Flags || (B3_Flags = {}));
   var SIGMA2 = /* @__PURE__ */ (() => {
     const Id2 = Array.from({ length: 16 }, (_, i) => i);
     const permute = (arr) => [2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8].map((i) => arr[i]);
@@ -900,7 +989,7 @@ var nobleHashes = (() => {
       this.chunkOut = 0;
       this.enableXOF = true;
       this.outputLen = opts.dkLen === void 0 ? 32 : opts.dkLen;
-      number(this.outputLen);
+      anumber(this.outputLen);
       if (opts.key !== void 0 && opts.context !== void 0)
         throw new Error("Blake3: only key or context can be specified at same time");
       else if (opts.key !== void 0) {
@@ -910,17 +999,13 @@ var nobleHashes = (() => {
         this.IV = u32(key);
         if (!isLE)
           byteSwap32(this.IV);
-        this.flags = flags | 16;
+        this.flags = flags | B3_Flags.KEYED_HASH;
       } else if (opts.context !== void 0) {
-        const context_key = new _BLAKE3(
-          { dkLen: 32 },
-          32
-          /* B3_Flags.DERIVE_KEY_CONTEXT */
-        ).update(opts.context).digest();
+        const context_key = new _BLAKE3({ dkLen: 32 }, B3_Flags.DERIVE_KEY_CONTEXT).update(opts.context).digest();
         this.IV = u32(context_key);
         if (!isLE)
           byteSwap32(this.IV);
-        this.flags = flags | 64;
+        this.flags = flags | B3_Flags.DERIVE_KEY_MATERIAL;
       } else {
         this.IV = B2S_IV.slice();
         this.flags = flags;
@@ -950,9 +1035,9 @@ var nobleHashes = (() => {
     compress(buf, bufPos = 0, isLast = false) {
       let flags = this.flags;
       if (!this.chunkPos)
-        flags |= 1;
+        flags |= B3_Flags.CHUNK_START;
       if (this.chunkPos === 15 || isLast)
-        flags |= 2;
+        flags |= B3_Flags.CHUNK_END;
       if (!isLast)
         this.pos = this.blockLen;
       this.b2Compress(this.chunksDone, flags, buf, bufPos);
@@ -966,7 +1051,7 @@ var nobleHashes = (() => {
           this.buffer32.set(last, 0);
           this.buffer32.set(chunk, 8);
           this.pos = this.blockLen;
-          this.b2Compress(0, this.flags | 4, this.buffer32, 0);
+          this.b2Compress(0, this.flags | B3_Flags.PARENT, this.buffer32, 0);
           chunk = this.state;
           this.state = this.IV.slice();
         }
@@ -1034,9 +1119,9 @@ var nobleHashes = (() => {
         return;
       this.finished = true;
       this.buffer.fill(0, this.pos);
-      let flags = this.flags | 8;
+      let flags = this.flags | B3_Flags.ROOT;
       if (this.stack.length) {
-        flags |= 4;
+        flags |= B3_Flags.PARENT;
         if (!isLE)
           byteSwap32(this.buffer32);
         this.compress(this.buffer32, 0, true);
@@ -1045,14 +1130,14 @@ var nobleHashes = (() => {
         this.chunksDone = 0;
         this.pos = this.blockLen;
       } else {
-        flags |= (!this.chunkPos ? 1 : 0) | 2;
+        flags |= (!this.chunkPos ? B3_Flags.CHUNK_START : 0) | B3_Flags.CHUNK_END;
       }
       this.flags = flags;
       this.b2CompressOut();
     }
     writeInto(out) {
-      exists(this, false);
-      bytes(out);
+      aexists(this, false);
+      abytes(out);
       this.finish();
       const { blockLen, bufferOut } = this;
       for (let pos = 0, len = out.length; pos < len; ) {
@@ -1070,12 +1155,12 @@ var nobleHashes = (() => {
         throw new Error("XOF is not possible after digest call");
       return this.writeInto(out);
     }
-    xof(bytes2) {
-      number(bytes2);
-      return this.xofInto(new Uint8Array(bytes2));
+    xof(bytes) {
+      anumber(bytes);
+      return this.xofInto(new Uint8Array(bytes));
     }
     digestInto(out) {
-      output(out, this);
+      aoutput(out, this);
       if (this.finished)
         throw new Error("digest() was already called");
       this.enableXOF = false;
@@ -1089,39 +1174,39 @@ var nobleHashes = (() => {
   };
   var blake3 = /* @__PURE__ */ wrapXOFConstructorWithOpts((opts) => new BLAKE3(opts));
 
-  // ../esm/hmac.js
+  // ../../esm/hmac.js
   var HMAC = class extends Hash {
-    constructor(hash2, _key) {
+    constructor(hash, _key) {
       super();
       this.finished = false;
       this.destroyed = false;
-      hash(hash2);
+      ahash(hash);
       const key = toBytes(_key);
-      this.iHash = hash2.create();
+      this.iHash = hash.create();
       if (typeof this.iHash.update !== "function")
         throw new Error("Expected instance of class which extends utils.Hash");
       this.blockLen = this.iHash.blockLen;
       this.outputLen = this.iHash.outputLen;
       const blockLen = this.blockLen;
       const pad = new Uint8Array(blockLen);
-      pad.set(key.length > blockLen ? hash2.create().update(key).digest() : key);
+      pad.set(key.length > blockLen ? hash.create().update(key).digest() : key);
       for (let i = 0; i < pad.length; i++)
         pad[i] ^= 54;
       this.iHash.update(pad);
-      this.oHash = hash2.create();
+      this.oHash = hash.create();
       for (let i = 0; i < pad.length; i++)
         pad[i] ^= 54 ^ 92;
       this.oHash.update(pad);
       pad.fill(0);
     }
     update(buf) {
-      exists(this);
+      aexists(this);
       this.iHash.update(buf);
       return this;
     }
     digestInto(out) {
-      exists(this);
-      bytes(out, this.outputLen);
+      aexists(this);
+      abytes(out, this.outputLen);
       this.finished = true;
       this.iHash.digestInto(out);
       this.oHash.update(out);
@@ -1151,34 +1236,34 @@ var nobleHashes = (() => {
       this.iHash.destroy();
     }
   };
-  var hmac = (hash2, key, message) => new HMAC(hash2, key).update(message).digest();
-  hmac.create = (hash2, key) => new HMAC(hash2, key);
+  var hmac = (hash, key, message) => new HMAC(hash, key).update(message).digest();
+  hmac.create = (hash, key) => new HMAC(hash, key);
 
-  // ../esm/hkdf.js
-  function extract(hash2, ikm, salt) {
-    hash(hash2);
+  // ../../esm/hkdf.js
+  function extract(hash, ikm, salt) {
+    ahash(hash);
     if (salt === void 0)
-      salt = new Uint8Array(hash2.outputLen);
-    return hmac(hash2, toBytes(salt), toBytes(ikm));
+      salt = new Uint8Array(hash.outputLen);
+    return hmac(hash, toBytes(salt), toBytes(ikm));
   }
   var HKDF_COUNTER = /* @__PURE__ */ new Uint8Array([0]);
   var EMPTY_BUFFER = /* @__PURE__ */ new Uint8Array();
-  function expand(hash2, prk, info, length = 32) {
-    hash(hash2);
-    number(length);
-    if (length > 255 * hash2.outputLen)
+  function expand(hash, prk, info, length = 32) {
+    ahash(hash);
+    anumber(length);
+    if (length > 255 * hash.outputLen)
       throw new Error("Length should be <= 255*HashLen");
-    const blocks = Math.ceil(length / hash2.outputLen);
+    const blocks = Math.ceil(length / hash.outputLen);
     if (info === void 0)
       info = EMPTY_BUFFER;
-    const okm = new Uint8Array(blocks * hash2.outputLen);
-    const HMAC2 = hmac.create(hash2, prk);
+    const okm = new Uint8Array(blocks * hash.outputLen);
+    const HMAC2 = hmac.create(hash, prk);
     const HMACTmp = HMAC2._cloneInto();
     const T = new Uint8Array(HMAC2.outputLen);
     for (let counter = 0; counter < blocks; counter++) {
       HKDF_COUNTER[0] = counter + 1;
       HMACTmp.update(counter === 0 ? EMPTY_BUFFER : T).update(info).update(HKDF_COUNTER).digestInto(T);
-      okm.set(T, hash2.outputLen * counter);
+      okm.set(T, hash.outputLen * counter);
       HMAC2._cloneInto(HMACTmp);
     }
     HMAC2.destroy();
@@ -1187,22 +1272,22 @@ var nobleHashes = (() => {
     HKDF_COUNTER.fill(0);
     return okm.slice(0, length);
   }
-  var hkdf = (hash2, ikm, salt, info, length) => expand(hash2, extract(hash2, ikm, salt), info, length);
+  var hkdf = (hash, ikm, salt, info, length) => expand(hash, extract(hash, ikm, salt), info, length);
 
-  // ../esm/pbkdf2.js
-  function pbkdf2Init(hash2, _password, _salt, _opts) {
-    hash(hash2);
+  // ../../esm/pbkdf2.js
+  function pbkdf2Init(hash, _password, _salt, _opts) {
+    ahash(hash);
     const opts = checkOpts({ dkLen: 32, asyncTick: 10 }, _opts);
     const { c, dkLen, asyncTick } = opts;
-    number(c);
-    number(dkLen);
-    number(asyncTick);
+    anumber(c);
+    anumber(dkLen);
+    anumber(asyncTick);
     if (c < 1)
       throw new Error("PBKDF2: iterations (c) should be >= 1");
     const password = toBytes(_password);
     const salt = toBytes(_salt);
     const DK = new Uint8Array(dkLen);
-    const PRF = hmac.create(hash2, password);
+    const PRF = hmac.create(hash, password);
     const PRFSalt = PRF._cloneInto().update(salt);
     return { c, dkLen, asyncTick, DK, PRF, PRFSalt };
   }
@@ -1214,8 +1299,8 @@ var nobleHashes = (() => {
     u.fill(0);
     return DK;
   }
-  function pbkdf2(hash2, password, salt, opts) {
-    const { c, dkLen, DK, PRF, PRFSalt } = pbkdf2Init(hash2, password, salt, opts);
+  function pbkdf2(hash, password, salt, opts) {
+    const { c, dkLen, DK, PRF, PRFSalt } = pbkdf2Init(hash, password, salt, opts);
     let prfW;
     const arr = new Uint8Array(4);
     const view = createView(arr);
@@ -1233,8 +1318,8 @@ var nobleHashes = (() => {
     }
     return pbkdf2Output(PRF, PRFSalt, DK, prfW, u);
   }
-  async function pbkdf2Async(hash2, password, salt, opts) {
-    const { c, dkLen, asyncTick, DK, PRF, PRFSalt } = pbkdf2Init(hash2, password, salt, opts);
+  async function pbkdf2Async(hash, password, salt, opts) {
+    const { c, dkLen, asyncTick, DK, PRF, PRFSalt } = pbkdf2Init(hash, password, salt, opts);
     let prfW;
     const arr = new Uint8Array(4);
     const view = createView(arr);
@@ -1253,7 +1338,7 @@ var nobleHashes = (() => {
     return pbkdf2Output(PRF, PRFSalt, DK, prfW, u);
   }
 
-  // ../esm/_md.js
+  // ../../esm/_md.js
   function setBigUint64(view, byteOffset, value, isLE2) {
     if (typeof view.setBigUint64 === "function")
       return view.setBigUint64(byteOffset, value, isLE2);
@@ -1266,8 +1351,12 @@ var nobleHashes = (() => {
     view.setUint32(byteOffset + h, wh, isLE2);
     view.setUint32(byteOffset + l, wl, isLE2);
   }
-  var Chi = (a, b, c) => a & b ^ ~a & c;
-  var Maj = (a, b, c) => a & b ^ a & c ^ b & c;
+  function Chi(a, b, c) {
+    return a & b ^ ~a & c;
+  }
+  function Maj(a, b, c) {
+    return a & b ^ a & c ^ b & c;
+  }
   var HashMD = class extends Hash {
     constructor(blockLen, outputLen, padOffset, isLE2) {
       super();
@@ -1283,7 +1372,7 @@ var nobleHashes = (() => {
       this.view = createView(this.buffer);
     }
     update(data) {
-      exists(this);
+      aexists(this);
       const { view, buffer, blockLen } = this;
       data = toBytes(data);
       const len = data.length;
@@ -1308,8 +1397,8 @@ var nobleHashes = (() => {
       return this;
     }
     digestInto(out) {
-      exists(this);
-      output(out, this);
+      aexists(this);
+      aoutput(out, this);
       this.finished = true;
       const { buffer, view, blockLen, isLE: isLE2 } = this;
       let { pos } = this;
@@ -1355,7 +1444,7 @@ var nobleHashes = (() => {
     }
   };
 
-  // ../esm/ripemd160.js
+  // ../../esm/ripemd160.js
   var Rho = /* @__PURE__ */ new Uint8Array([7, 4, 13, 1, 10, 6, 15, 3, 12, 0, 9, 5, 2, 14, 11, 8]);
   var Id = /* @__PURE__ */ new Uint8Array(new Array(16).fill(0).map((_, i) => i));
   var Pi = /* @__PURE__ */ Id.map((i) => (9 * i + 5) % 16);
@@ -1451,7 +1540,7 @@ var nobleHashes = (() => {
   };
   var ripemd160 = /* @__PURE__ */ wrapConstructor(() => new RIPEMD160());
 
-  // ../esm/sha256.js
+  // ../../esm/sha256.js
   var SHA256_K = /* @__PURE__ */ new Uint32Array([
     1116352408,
     1899447441,
@@ -1616,7 +1705,7 @@ var nobleHashes = (() => {
   var sha256 = /* @__PURE__ */ wrapConstructor(() => new SHA256());
   var sha224 = /* @__PURE__ */ wrapConstructor(() => new SHA224());
 
-  // ../esm/scrypt.js
+  // ../../esm/scrypt.js
   function XorAndSalsa(prev, pi, input, ii, out, oi) {
     let y00 = prev[pi++] ^ input[ii++], y01 = prev[pi++] ^ input[ii++];
     let y02 = prev[pi++] ^ input[ii++], y03 = prev[pi++] ^ input[ii++];
@@ -1697,12 +1786,12 @@ var nobleHashes = (() => {
       maxmem: 1024 ** 3 + 1024
     }, _opts);
     const { N, r, p, dkLen, asyncTick, maxmem, onProgress } = opts;
-    number(N);
-    number(r);
-    number(p);
-    number(dkLen);
-    number(asyncTick);
-    number(maxmem);
+    anumber(N);
+    anumber(r);
+    anumber(p);
+    anumber(dkLen);
+    anumber(asyncTick);
+    anumber(maxmem);
     if (onProgress !== void 0 && typeof onProgress !== "function")
       throw new Error("progressCb should be function");
     const blockSize = 128 * r;
@@ -1718,7 +1807,7 @@ var nobleHashes = (() => {
     }
     const memUsed = blockSize * (N + p);
     if (memUsed > maxmem) {
-      throw new Error(`Scrypt: parameters too large, ${memUsed} (128 * r * (N + p)) > ${maxmem} (maxmem)`);
+      throw new Error("Scrypt: memused is bigger than maxMem. Expected 128 * r * (N + p) > maxmem of " + maxmem);
     }
     const B = pbkdf2(sha256, password, salt, { c: 1, dkLen: blockSize * p });
     const B32 = u32(B);
@@ -1799,7 +1888,7 @@ var nobleHashes = (() => {
     return scryptOutput(password, dkLen, B, V, tmp);
   }
 
-  // ../esm/sha512.js
+  // ../../esm/sha512.js
   var [SHA512_Kh, SHA512_Kl] = /* @__PURE__ */ (() => u64_default.split([
     "0x428a2f98d728ae22",
     "0x7137449123ef65cd",
@@ -2067,7 +2156,7 @@ var nobleHashes = (() => {
   var sha512_256 = /* @__PURE__ */ wrapConstructor(() => new SHA512_256());
   var sha384 = /* @__PURE__ */ wrapConstructor(() => new SHA384());
 
-  // ../esm/sha3.js
+  // ../../esm/sha3.js
   var SHA3_PI = [];
   var SHA3_ROTL = [];
   var _SHA3_IOTA = [];
@@ -2145,7 +2234,7 @@ var nobleHashes = (() => {
       this.posOut = 0;
       this.finished = false;
       this.destroyed = false;
-      number(outputLen);
+      anumber(outputLen);
       if (0 >= this.blockLen || this.blockLen >= 200)
         throw new Error("Sha3 supports only keccak-f1600 function");
       this.state = new Uint8Array(200);
@@ -2161,7 +2250,7 @@ var nobleHashes = (() => {
       this.pos = 0;
     }
     update(data) {
-      exists(this);
+      aexists(this);
       const { blockLen, state } = this;
       data = toBytes(data);
       const len = data.length;
@@ -2186,8 +2275,8 @@ var nobleHashes = (() => {
       this.keccak();
     }
     writeInto(out) {
-      exists(this, false);
-      bytes(out);
+      aexists(this, false);
+      abytes(out);
       this.finish();
       const bufferOut = this.state;
       const { blockLen } = this;
@@ -2206,12 +2295,12 @@ var nobleHashes = (() => {
         throw new Error("XOF is not possible for this instance");
       return this.writeInto(out);
     }
-    xof(bytes2) {
-      number(bytes2);
-      return this.xofInto(new Uint8Array(bytes2));
+    xof(bytes) {
+      anumber(bytes);
+      return this.xofInto(new Uint8Array(bytes));
     }
     digestInto(out) {
-      output(out, this);
+      aoutput(out, this);
       if (this.finished)
         throw new Error("digest() was already called");
       this.writeInto(out);
@@ -2253,20 +2342,24 @@ var nobleHashes = (() => {
   var shake128 = /* @__PURE__ */ genShake(31, 168, 128 / 8);
   var shake256 = /* @__PURE__ */ genShake(31, 136, 256 / 8);
 
-  // ../esm/sha3-addons.js
+  // ../../esm/sha3-addons.js
+  var _8n = BigInt(8);
+  var _ffn = BigInt(255);
   function leftEncode(n) {
-    const res = [n & 255];
-    n >>= 8;
-    for (; n > 0; n >>= 8)
-      res.unshift(n & 255);
+    n = BigInt(n);
+    const res = [Number(n & _ffn)];
+    n >>= _8n;
+    for (; n > 0; n >>= _8n)
+      res.unshift(Number(n & _ffn));
     res.unshift(res.length);
     return new Uint8Array(res);
   }
   function rightEncode(n) {
-    const res = [n & 255];
-    n >>= 8;
-    for (; n > 0; n >>= 8)
-      res.unshift(n & 255);
+    n = BigInt(n);
+    const res = [Number(n & _ffn)];
+    n >>= _8n;
+    for (; n > 0; n >>= _8n)
+      res.unshift(Number(n & _ffn));
     res.push(res.length);
     return new Uint8Array(res);
   }
@@ -2275,21 +2368,21 @@ var nobleHashes = (() => {
   }
   var toBytesOptional = (buf) => buf !== void 0 ? toBytes(buf) : new Uint8Array([]);
   var getPadding = (len, block2) => new Uint8Array((block2 - len % block2) % block2);
-  function cshakePers(hash2, opts = {}) {
+  function cshakePers(hash, opts = {}) {
     if (!opts || !opts.personalization && !opts.NISTfn)
-      return hash2;
-    const blockLenBytes = leftEncode(hash2.blockLen);
+      return hash;
+    const blockLenBytes = leftEncode(hash.blockLen);
     const fn = toBytesOptional(opts.NISTfn);
-    const fnLen = leftEncode(8 * fn.length);
+    const fnLen = leftEncode(_8n * BigInt(fn.length));
     const pers = toBytesOptional(opts.personalization);
-    const persLen = leftEncode(8 * pers.length);
+    const persLen = leftEncode(_8n * BigInt(pers.length));
     if (!fn.length && !pers.length)
-      return hash2;
-    hash2.suffix = 4;
-    hash2.update(blockLenBytes).update(fnLen).update(fn).update(persLen).update(pers);
+      return hash;
+    hash.suffix = 4;
+    hash.update(blockLenBytes).update(fnLen).update(fn).update(persLen).update(pers);
     let totalLen = blockLenBytes.length + fnLen.length + fn.length + persLen.length + pers.length;
-    hash2.update(getPadding(totalLen, hash2.blockLen));
-    return hash2;
+    hash.update(getPadding(totalLen, hash.blockLen));
+    return hash;
   }
   var gencShake = (suffix, blockLen, outputLen) => wrapXOFConstructorWithOpts((opts = {}) => cshakePers(new Keccak(blockLen, suffix, chooseLen(opts, outputLen), true), opts));
   var cshake128 = /* @__PURE__ */ (() => gencShake(31, 168, 128 / 8))();
@@ -2300,14 +2393,14 @@ var nobleHashes = (() => {
       cshakePers(this, { NISTfn: "KMAC", personalization: opts.personalization });
       key = toBytes(key);
       const blockLenBytes = leftEncode(this.blockLen);
-      const keyLen = leftEncode(8 * key.length);
+      const keyLen = leftEncode(_8n * BigInt(key.length));
       this.update(blockLenBytes).update(keyLen).update(key);
       const totalLen = blockLenBytes.length + keyLen.length + key.length;
       this.update(getPadding(totalLen, this.blockLen));
     }
     finish() {
       if (!this.finished)
-        this.update(rightEncode(this.enableXOF ? 0 : this.outputLen * 8));
+        this.update(rightEncode(this.enableXOF ? 0 : _8n * BigInt(this.outputLen)));
       super.finish();
     }
     _cloneInto(to) {
@@ -2333,17 +2426,18 @@ var nobleHashes = (() => {
   var genTurboshake = (blockLen, outputLen) => wrapXOFConstructorWithOpts((opts = {}) => {
     const D = opts.D === void 0 ? 31 : opts.D;
     if (!Number.isSafeInteger(D) || D < 1 || D > 127)
-      throw new Error(`turboshake: wrong domain separation byte: ${D}, should be 0x01..0x7f`);
+      throw new Error("invalid domain separation byte must be 0x01..0x7f, got: " + D);
     return new Keccak(blockLen, D, opts.dkLen === void 0 ? outputLen : opts.dkLen, true, 12);
   });
   var turboshake128 = /* @__PURE__ */ genTurboshake(168, 256 / 8);
   var turboshake256 = /* @__PURE__ */ genTurboshake(136, 512 / 8);
   function rightEncodeK12(n) {
+    n = BigInt(n);
     const res = [];
-    for (; n > 0; n >>= 8)
-      res.unshift(n & 255);
+    for (; n > 0; n >>= _8n)
+      res.unshift(Number(n & _ffn));
     res.push(res.length);
-    return new Uint8Array(res);
+    return Uint8Array.from(res);
   }
   var EMPTY = new Uint8Array([]);
   var KangarooTwelve = class _KangarooTwelve extends Keccak {
@@ -2419,7 +2513,7 @@ var nobleHashes = (() => {
   var k12 = /* @__PURE__ */ (() => wrapConstructorWithOpts((opts = {}) => new KangarooTwelve(168, 32, chooseLen(opts, 32), 12, opts)))();
   var m14 = /* @__PURE__ */ (() => wrapConstructorWithOpts((opts = {}) => new KangarooTwelve(136, 64, chooseLen(opts, 64), 14, opts)))();
 
-  // ../esm/sha1.js
+  // ../../esm/sha1.js
   var SHA1_IV = /* @__PURE__ */ new Uint32Array([
     1732584193,
     4023233417,
@@ -2493,7 +2587,8 @@ var nobleHashes = (() => {
   };
   var sha1 = /* @__PURE__ */ wrapConstructor(() => new SHA1());
 
-  // ../esm/argon2.js
+  // ../../esm/argon2.js
+  var AT = { Argond2d: 0, Argon2i: 1, Argon2id: 2 };
   var ARGON2_SYNC_POINTS = 4;
   var toBytesOptional2 = (buf) => buf !== void 0 ? toBytes(buf) : new Uint8Array([]);
   function mul(a, b) {
@@ -2505,12 +2600,10 @@ var nobleHashes = (() => {
     const hl = Math.imul(aH, bL);
     const lh = Math.imul(aL, bH);
     const hh = Math.imul(aH, bH);
-    const BUF = (ll >>> 16) + (hl & 65535) + lh | 0;
-    const h = (hl >>> 16) + (BUF >>> 16) + hh | 0;
-    return { h, l: BUF << 16 | ll & 65535 };
-  }
-  function relPos(areaSize, relativePos) {
-    return areaSize - 1 - mul(areaSize, mul(relativePos, relativePos).h).h;
+    const carry = (ll >>> 16) + (hl & 65535) + lh;
+    const high = hh + (hl >>> 16) + (carry >>> 16) | 0;
+    const low = carry << 16 | ll & 65535;
+    return { h: high, l: low };
   }
   function mul2(a, b) {
     const { h, l } = mul(a, b);
@@ -2569,6 +2662,7 @@ var nobleHashes = (() => {
     else
       for (let i = 0; i < 256; i++)
         x[outPos + i] = A2_BUF[i] ^ x[xPos + i] ^ x[yPos + i];
+    A2_BUF.fill(0);
   }
   function Hp(A, dkLen) {
     const A8 = u8(A);
@@ -2582,15 +2676,21 @@ var nobleHashes = (() => {
     let pos = 0;
     out.set(V.subarray(0, 32));
     pos += 32;
-    for (; dkLen - pos > 64; pos += 32)
-      out.set((V = blake2b(V)).subarray(0, 32), pos);
+    for (; dkLen - pos > 64; pos += 32) {
+      const Vh = blake2b.create({}).update(V);
+      Vh.digestInto(V);
+      Vh.destroy();
+      out.set(V.subarray(0, 32), pos);
+    }
     out.set(blake2b(V, { dkLen: dkLen - pos }), pos);
+    V.fill(0);
+    T.fill(0);
     return u32(out);
   }
   function indexAlpha(r, s, laneLen, segmentLen, index, randL, sameLane = false) {
     let area;
-    if (0 == r) {
-      if (0 == s)
+    if (r === 0) {
+      if (s === 0)
         area = index - 1;
       else if (sameLane)
         area = s * segmentLen + index - 1;
@@ -2601,54 +2701,57 @@ var nobleHashes = (() => {
     else
       area = laneLen - segmentLen + (index == 0 ? -1 : 0);
     const startPos = r !== 0 && s !== ARGON2_SYNC_POINTS - 1 ? (s + 1) * segmentLen : 0;
-    const rel = relPos(area, randL);
+    const rel = area - 1 - mul(area, mul(randL, randL).h).h;
     return (startPos + rel) % laneLen;
   }
-  function argon2Init(type, password, salt, opts) {
-    password = toBytes(password);
-    salt = toBytes(salt);
-    let { p, dkLen, m, t, version, key, personalization, maxmem, onProgress } = {
-      ...opts,
-      version: opts.version || 19,
-      dkLen: opts.dkLen || 32,
-      maxmem: 2 ** 32
+  var maxUint32 = 2 ** 32;
+  function isUint32(num) {
+    return Number.isSafeInteger(num) && num >= 0 && num < maxUint32;
+  }
+  function initOpts(opts) {
+    const merged = {
+      version: 19,
+      dkLen: 32,
+      maxmem: 2 ** 32 - 1,
+      asyncTick: 10
     };
-    number(p);
-    number(dkLen);
-    number(m);
-    number(t);
-    number(version);
-    if (dkLen < 4 || dkLen >= 2 ** 32)
+    for (let [k, v] of Object.entries(opts))
+      if (v != null)
+        merged[k] = v;
+    const { dkLen, p, m, t, version, onProgress } = merged;
+    if (!isUint32(dkLen) || dkLen < 4)
       throw new Error("Argon2: dkLen should be at least 4 bytes");
-    if (p < 1 || p >= 2 ** 32)
-      throw new Error("Argon2: p (parallelism) should be at least 1");
-    if (t < 1 || t >= 2 ** 32)
-      throw new Error("Argon2: t (iterations) should be at least 1");
-    if (m < 8 * p)
-      throw new Error(`Argon2: memory should be at least 8*p bytes`);
-    if (version !== 16 && version !== 19)
-      throw new Error(`Argon2: unknown version=${version}`);
-    password = toBytes(password);
-    if (password.length < 0 || password.length >= 2 ** 32)
-      throw new Error("Argon2: password should be less than 4 GB");
-    salt = toBytes(salt);
-    if (salt.length < 8)
-      throw new Error("Argon2: salt should be at least 8 bytes");
-    key = toBytesOptional2(key);
-    personalization = toBytesOptional2(personalization);
+    if (!isUint32(p) || p < 1 || p >= 2 ** 24)
+      throw new Error("Argon2: p (parallelism) should be at least 1 and less than 2^24");
+    if (!isUint32(m))
+      throw new Error("Argon2: m should be 0 <= m < 2^32");
+    if (!isUint32(t) || t < 1)
+      throw new Error("Argon2: t (iterations) should be at least 1 and less than 2^32");
     if (onProgress !== void 0 && typeof onProgress !== "function")
       throw new Error("progressCb should be function");
-    const lanes = p;
-    const mP = 4 * p * Math.floor(m / (ARGON2_SYNC_POINTS * p));
-    const laneLen = Math.floor(mP / p);
-    const segmentLen = Math.floor(laneLen / ARGON2_SYNC_POINTS);
+    if (!isUint32(m) || m < 8 * p)
+      throw new Error("Argon2: memory should be at least 8*p bytes");
+    if (version !== 16 && version !== 19)
+      throw new Error("Argon2: unknown version=" + version);
+    return merged;
+  }
+  function argon2Init(password, salt, type, opts) {
+    password = toBytes(password);
+    salt = toBytes(salt);
+    if (!isUint32(password.length))
+      throw new Error("Argon2: password should be less than 4 GB");
+    if (!isUint32(salt.length) || salt.length < 8)
+      throw new Error("Argon2: salt should be at least 8 bytes and less than 4 GB");
+    if (!Object.values(AT).includes(type))
+      throw new Error("invalid argon2 type");
+    let { p, dkLen, m, t, version, key, personalization, maxmem, onProgress, asyncTick } = initOpts(opts);
+    key = toBytesOptional2(key);
+    personalization = toBytesOptional2(personalization);
     const h = blake2b.create({});
     const BUF = new Uint32Array(1);
     const BUF8 = u8(BUF);
-    for (const i of [p, dkLen, m, t, version, type]) {
-      if (i < 0 || i >= 2 ** 32)
-        throw new Error(`Argon2: wrong parameter=${i}, expected uint32`);
-      BUF[0] = i;
+    for (let item of [p, dkLen, m, t, version, type]) {
+      BUF[0] = item;
       h.update(BUF8);
     }
     for (let i of [password, salt, key, personalization]) {
@@ -2658,10 +2761,13 @@ var nobleHashes = (() => {
     const H0 = new Uint32Array(18);
     const H0_8 = u8(H0);
     h.digestInto(H0_8);
+    const lanes = p;
+    const mP = 4 * p * Math.floor(m / (ARGON2_SYNC_POINTS * p));
+    const laneLen = Math.floor(mP / p);
+    const segmentLen = Math.floor(laneLen / ARGON2_SYNC_POINTS);
     const memUsed = mP * 256;
-    if (memUsed < 0 || memUsed >= 2 ** 32 || memUsed > maxmem) {
-      throw new Error(`Argon2: wrong params (memUsed=${memUsed} maxmem=${maxmem}), should be less than 2**32`);
-    }
+    if (!isUint32(maxmem) || memUsed > maxmem)
+      throw new Error("Argon2: mem should be less than 2**32, got: maxmem=" + maxmem + ", memused=" + memUsed);
     const B = new Uint32Array(memUsed);
     for (let l = 0; l < p; l++) {
       const i = 256 * laneLen * l;
@@ -2683,27 +2789,32 @@ var nobleHashes = (() => {
           onProgress(blockCnt / totalBlock);
       };
     }
-    return { type, mP, p, t, version, B, laneLen, lanes, segmentLen, dkLen, perBlock };
+    BUF.fill(0);
+    H0.fill(0);
+    return { type, mP, p, t, version, B, laneLen, lanes, segmentLen, dkLen, perBlock, asyncTick };
   }
   function argon2Output(B, p, laneLen, dkLen) {
     const B_final = new Uint32Array(256);
     for (let l = 0; l < p; l++)
       for (let j = 0; j < 256; j++)
         B_final[j] ^= B[256 * (laneLen * l + laneLen - 1) + j];
-    return u8(Hp(B_final, dkLen));
+    const res = u8(Hp(B_final, dkLen));
+    B_final.fill(0);
+    return res;
   }
   function processBlock(B, address, l, r, s, index, laneLen, segmentLen, lanes, offset, prev, dataIndependent, needXor) {
     if (offset % laneLen)
       prev = offset - 1;
     let randL, randH;
     if (dataIndependent) {
-      if (index % 128 === 0) {
+      let i128 = index % 128;
+      if (i128 === 0) {
         address[256 + 12]++;
         block(address, 256, 2 * 256, 0, false);
         block(address, 0, 2 * 256, 0, false);
       }
-      randL = address[2 * (index % 128)];
-      randH = address[2 * (index % 128) + 1];
+      randL = address[2 * i128];
+      randH = address[2 * i128 + 1];
     } else {
       const T = 256 * prev;
       randL = B[T];
@@ -2715,7 +2826,7 @@ var nobleHashes = (() => {
     block(B, 256 * prev, 256 * refBlock, offset * 256, needXor);
   }
   function argon2(type, password, salt, opts) {
-    const { mP, p, t, version, B, laneLen, lanes, segmentLen, dkLen, perBlock } = argon2Init(type, password, salt, opts);
+    const { mP, p, t, version, B, laneLen, lanes, segmentLen, dkLen, perBlock } = argon2Init(password, salt, type, opts);
     const address = new Uint32Array(3 * 256);
     address[256 + 6] = mP;
     address[256 + 8] = t;
@@ -2725,7 +2836,7 @@ var nobleHashes = (() => {
       address[256 + 0] = r;
       for (let s = 0; s < ARGON2_SYNC_POINTS; s++) {
         address[256 + 4] = s;
-        const dataIndependent = type == 1 || type == 2 && r === 0 && s < 2;
+        const dataIndependent = type == AT.Argon2i || type == AT.Argon2id && r === 0 && s < 2;
         for (let l = 0; l < p; l++) {
           address[256 + 2] = l;
           address[256 + 12] = 0;
@@ -2747,11 +2858,12 @@ var nobleHashes = (() => {
         }
       }
     }
+    address.fill(0);
     return argon2Output(B, p, laneLen, dkLen);
   }
-  var argon2id = (password, salt, opts) => argon2(2, password, salt, opts);
+  var argon2id = (password, salt, opts) => argon2(AT.Argon2id, password, salt, opts);
 
-  // ../esm/eskdf.js
+  // ../../esm/eskdf.js
   var SCRYPT_FACTOR = 2 ** 19;
   var PBKDF2_FACTOR = 2 ** 17;
   function scrypt2(password, salt) {
@@ -2761,8 +2873,8 @@ var nobleHashes = (() => {
     return pbkdf2(sha256, password, salt, { c: PBKDF2_FACTOR, dkLen: 32 });
   }
   function xor32(a, b) {
-    bytes(a, 32);
-    bytes(b, 32);
+    abytes(a, 32);
+    abytes(b, 32);
     const arr = new Uint8Array(32);
     for (let i = 0; i < 32; i++) {
       arr[i] = a[i] ^ b[i];
@@ -2777,8 +2889,10 @@ var nobleHashes = (() => {
       throw new Error("invalid username");
     if (!strHasLength(password, 8, 255))
       throw new Error("invalid password");
-    const scr = scrypt2(password + "", username + "");
-    const pbk = pbkdf22(password + "", username + "");
+    const codes = { _1: 1, _2: 2 };
+    const sep = { s: String.fromCharCode(codes._1), p: String.fromCharCode(codes._2) };
+    const scr = scrypt2(password + sep.s, username + sep.s);
+    const pbk = pbkdf22(password + sep.p, username + sep.p);
     const res = xor32(scr, pbk);
     scr.fill(0);
     pbk.fill(0);
@@ -2794,7 +2908,7 @@ var nobleHashes = (() => {
       if (!allowsStr)
         throw new Error("accountId must be a number");
       if (!strHasLength(accountId, 1, 255))
-        throw new Error("accountId must be valid string");
+        throw new Error("accountId must be string of length 1..255");
       salt = toBytes(accountId);
     } else if (Number.isSafeInteger(accountId)) {
       if (accountId < 0 || accountId > 2 ** 32 - 1)
@@ -2802,7 +2916,7 @@ var nobleHashes = (() => {
       salt = new Uint8Array(4);
       createView(salt).setUint32(0, accountId, false);
     } else {
-      throw new Error(`accountId must be a number${allowsStr ? " or string" : ""}`);
+      throw new Error("accountId must be a number" + (allowsStr ? " or string" : ""));
     }
     const info = toBytes(protocol);
     return { salt, info };
@@ -2834,15 +2948,15 @@ var nobleHashes = (() => {
       throw new Error("expected positive number");
     const len = key.length - 8;
     const hex = res.toString(16).padStart(len * 2, "0");
-    const bytes2 = hexToBytes(hex);
-    if (bytes2.length !== len)
+    const bytes = hexToBytes(hex);
+    if (bytes.length !== len)
       throw new Error("invalid length of result key");
-    return bytes2;
+    return bytes;
   }
   async function eskdf(username, password) {
     let seed = deriveMainSeed(username, password);
     function deriveCK(protocol, accountId = 0, options) {
-      bytes(seed, 32);
+      abytes(seed, 32);
       const { salt, info } = getSaltInfo(protocol, accountId);
       const keyLength = getKeyLength(options);
       const key = hkdf(sha256, seed, salt, info, keyLength);

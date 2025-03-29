@@ -2,7 +2,7 @@
   "name": "KyberLock Universal",
   "short_name": "KyberLock",
   "description": "Quantum-proof encryption for any email, plus Passwords.",
-  "version": "1.0",
+  "version": "1.0.3",
   "manifest_version": 3,
   "icons": {
   "16": "img/favicon.png",
@@ -18,7 +18,7 @@
     "contextMenus", "history"
   ],
   "background":{
-    "service_worker": "background.js"
+    "scripts": ["background.js"]
     },
   "action": {
     "default_icon": {

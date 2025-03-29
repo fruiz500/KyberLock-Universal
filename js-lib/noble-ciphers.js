@@ -33,44 +33,44 @@ var nobleCiphers = (() => {
     gcm: () => gcm,
     salsa20: () => salsa20,
     siv: () => siv,
-    utils: () => utils2,
+    utils: () => utils,
     xchacha20poly1305: () => xchacha20poly1305,
     xsalsa20poly1305: () => xsalsa20poly1305
   });
 
-  // ../esm/_assert.js
-  function number(n) {
+  // ../../esm/_assert.js
+  function anumber(n) {
     if (!Number.isSafeInteger(n) || n < 0)
-      throw new Error(`positive integer expected, not ${n}`);
-  }
-  function bool(b) {
-    if (typeof b !== "boolean")
-      throw new Error(`boolean expected, not ${b}`);
+      throw new Error("positive integer expected, got " + n);
   }
   function isBytes(a) {
-    return a instanceof Uint8Array || a != null && typeof a === "object" && a.constructor.name === "Uint8Array";
+    return a instanceof Uint8Array || ArrayBuffer.isView(a) && a.constructor.name === "Uint8Array";
   }
-  function bytes(b, ...lengths) {
+  function abytes(b, ...lengths) {
     if (!isBytes(b))
       throw new Error("Uint8Array expected");
     if (lengths.length > 0 && !lengths.includes(b.length))
-      throw new Error(`Uint8Array expected of length ${lengths}, not of length=${b.length}`);
+      throw new Error("Uint8Array expected of length " + lengths + ", got length=" + b.length);
   }
-  function exists(instance, checkFinished = true) {
+  function aexists(instance, checkFinished = true) {
     if (instance.destroyed)
       throw new Error("Hash instance has been destroyed");
     if (checkFinished && instance.finished)
       throw new Error("Hash#digest() has already been called");
   }
-  function output(out, instance) {
-    bytes(out);
+  function aoutput(out, instance) {
+    abytes(out);
     const min = instance.outputLen;
     if (out.length < min) {
-      throw new Error(`digestInto() expects output buffer of length at least ${min}`);
+      throw new Error("digestInto() expects output buffer of length at least " + min);
     }
   }
+  function abool(b) {
+    if (typeof b !== "boolean")
+      throw new Error(`boolean expected, not ${b}`);
+  }
 
-  // ../esm/utils.js
+  // ../../esm/utils.js
   var u8 = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
   var u32 = (arr) => new Uint32Array(arr.buffer, arr.byteOffset, Math.floor(arr.byteLength / 4));
   var createView = (arr) => new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
@@ -78,22 +78,22 @@ var nobleCiphers = (() => {
   if (!isLE)
     throw new Error("Non little-endian hardware is not supported");
   var hexes = /* @__PURE__ */ Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, "0"));
-  function bytesToHex(bytes2) {
-    bytes(bytes2);
+  function bytesToHex(bytes) {
+    abytes(bytes);
     let hex = "";
-    for (let i = 0; i < bytes2.length; i++) {
-      hex += hexes[bytes2[i]];
+    for (let i = 0; i < bytes.length; i++) {
+      hex += hexes[bytes[i]];
     }
     return hex;
   }
-  var asciis = { _0: 48, _9: 57, _A: 65, _F: 70, _a: 97, _f: 102 };
-  function asciiToBase16(char) {
-    if (char >= asciis._0 && char <= asciis._9)
-      return char - asciis._0;
-    if (char >= asciis._A && char <= asciis._F)
-      return char - (asciis._A - 10);
-    if (char >= asciis._a && char <= asciis._f)
-      return char - (asciis._a - 10);
+  var asciis = { _0: 48, _9: 57, A: 65, F: 70, a: 97, f: 102 };
+  function asciiToBase16(ch) {
+    if (ch >= asciis._0 && ch <= asciis._9)
+      return ch - asciis._0;
+    if (ch >= asciis.A && ch <= asciis.F)
+      return ch - (asciis.A - 10);
+    if (ch >= asciis.a && ch <= asciis.f)
+      return ch - (asciis.a - 10);
     return;
   }
   function hexToBytes(hex) {
@@ -102,7 +102,7 @@ var nobleCiphers = (() => {
     const hl = hex.length;
     const al = hl / 2;
     if (hl % 2)
-      throw new Error("padded hex string expected, got unpadded hex of length " + hl);
+      throw new Error("hex string expected, got unpadded hex of length " + hl);
     const array = new Uint8Array(al);
     for (let ai = 0, hi = 0; ai < al; ai++, hi += 2) {
       const n1 = asciiToBase16(hex.charCodeAt(hi));
@@ -115,21 +115,13 @@ var nobleCiphers = (() => {
     }
     return array;
   }
-  function hexToNumber(hex) {
-    if (typeof hex !== "string")
-      throw new Error("hex string expected, got " + typeof hex);
-    return BigInt(hex === "" ? "0" : `0x${hex}`);
-  }
-  function numberToBytesBE(n, len) {
-    return hexToBytes(n.toString(16).padStart(len * 2, "0"));
-  }
   function utf8ToBytes(str) {
     if (typeof str !== "string")
-      throw new Error(`string expected, got ${typeof str}`);
+      throw new Error("string expected");
     return new Uint8Array(new TextEncoder().encode(str));
   }
-  function bytesToUtf8(bytes2) {
-    return new TextDecoder().decode(bytes2);
+  function bytesToUtf8(bytes) {
+    return new TextDecoder().decode(bytes);
   }
   function toBytes(data) {
     if (typeof data === "string")
@@ -137,14 +129,23 @@ var nobleCiphers = (() => {
     else if (isBytes(data))
       data = copyBytes(data);
     else
-      throw new Error(`Uint8Array expected, got ${typeof data}`);
+      throw new Error("Uint8Array expected, got " + typeof data);
     return data;
+  }
+  function overlapBytes(a, b) {
+    return a.buffer === b.buffer && // probably will fail with some obscure proxies, but this is best we can do
+    a.byteOffset < b.byteOffset + b.byteLength && // a starts before b end
+    b.byteOffset < a.byteOffset + a.byteLength;
+  }
+  function complexOverlapBytes(input, output) {
+    if (overlapBytes(input, output) && input.byteOffset < output.byteOffset)
+      throw new Error("complex overlap of input and output is not supported");
   }
   function concatBytes(...arrays) {
     let sum = 0;
     for (let i = 0; i < arrays.length; i++) {
       const a = arrays[i];
-      bytes(a);
+      abytes(a);
       sum += a.length;
     }
     const res = new Uint8Array(sum);
@@ -169,10 +170,62 @@ var nobleCiphers = (() => {
       diff |= a[i] ^ b[i];
     return diff === 0;
   }
-  var wrapCipher = /* @__NO_SIDE_EFFECTS__ */ (params, c) => {
-    Object.assign(c, params);
-    return c;
+  var wrapCipher = /* @__NO_SIDE_EFFECTS__ */ (params, constructor) => {
+    function wrappedCipher(key, ...args) {
+      abytes(key);
+      if (params.nonceLength !== void 0) {
+        const nonce = args[0];
+        if (!nonce)
+          throw new Error("nonce / iv required");
+        if (params.varSizeNonce)
+          abytes(nonce);
+        else
+          abytes(nonce, params.nonceLength);
+      }
+      const tagl = params.tagLength;
+      if (tagl && args[1] !== void 0) {
+        abytes(args[1]);
+      }
+      const cipher = constructor(key, ...args);
+      const checkOutput = (fnLength, output) => {
+        if (output !== void 0) {
+          if (fnLength !== 2)
+            throw new Error("cipher output not supported");
+          abytes(output);
+        }
+      };
+      let called = false;
+      const wrCipher = {
+        encrypt(data, output) {
+          if (called)
+            throw new Error("cannot encrypt() twice with same key + nonce");
+          called = true;
+          abytes(data);
+          checkOutput(cipher.encrypt.length, output);
+          return cipher.encrypt(data, output);
+        },
+        decrypt(data, output) {
+          abytes(data);
+          if (tagl && data.length < tagl)
+            throw new Error("invalid ciphertext length: smaller than tagLength=" + tagl);
+          checkOutput(cipher.decrypt.length, output);
+          return cipher.decrypt(data, output);
+        }
+      };
+      return wrCipher;
+    }
+    Object.assign(wrappedCipher, params);
+    return wrappedCipher;
   };
+  function getOutput(expectedLength, out, onlyAligned = true) {
+    if (out === void 0)
+      return new Uint8Array(expectedLength);
+    if (out.length !== expectedLength)
+      throw new Error("invalid output length, expected " + expectedLength + ", got: " + out.length);
+    if (onlyAligned && !isAligned32(out))
+      throw new Error("invalid output, must be aligned");
+    return out;
+  }
   function setBigUint64(view, byteOffset, value, isLE2) {
     if (typeof view.setBigUint64 === "function")
       return view.setBigUint64(byteOffset, value, isLE2);
@@ -185,11 +238,11 @@ var nobleCiphers = (() => {
     view.setUint32(byteOffset + h, wh, isLE2);
     view.setUint32(byteOffset + l, wl, isLE2);
   }
-  function isAligned32(bytes2) {
-    return bytes2.byteOffset % 4 === 0;
+  function isAligned32(bytes) {
+    return bytes.byteOffset % 4 === 0;
   }
-  function copyBytes(bytes2) {
-    return Uint8Array.from(bytes2);
+  function copyBytes(bytes) {
+    return Uint8Array.from(bytes);
   }
   function clean(...arrays) {
     for (let i = 0; i < arrays.length; i++) {
@@ -197,13 +250,12 @@ var nobleCiphers = (() => {
     }
   }
 
-  // ../esm/_arx.js
+  // ../../esm/_arx.js
   var _utf8ToBytes = (str) => Uint8Array.from(str.split("").map((c) => c.charCodeAt(0)));
   var sigma16 = _utf8ToBytes("expand 16-byte k");
   var sigma32 = _utf8ToBytes("expand 32-byte k");
   var sigma16_32 = u32(sigma16);
   var sigma32_32 = u32(sigma32);
-  var sigma = sigma32_32.slice();
   function rotl(a, b) {
     return a << b | a >>> 32 - b;
   }
@@ -214,15 +266,15 @@ var nobleCiphers = (() => {
   var BLOCK_LEN32 = 16;
   var MAX_COUNTER = 2 ** 32 - 1;
   var U32_EMPTY = new Uint32Array();
-  function runCipher(core, sigma2, key, nonce, data, output2, counter, rounds) {
+  function runCipher(core, sigma, key, nonce, data, output, counter, rounds) {
     const len = data.length;
     const block = new Uint8Array(BLOCK_LEN);
     const b32 = u32(block);
-    const isAligned = isAligned322(data) && isAligned322(output2);
+    const isAligned = isAligned322(data) && isAligned322(output);
     const d32 = isAligned ? u32(data) : U32_EMPTY;
-    const o32 = isAligned ? u32(output2) : U32_EMPTY;
+    const o32 = isAligned ? u32(output) : U32_EMPTY;
     for (let pos = 0; pos < len; counter++) {
-      core(sigma2, key, nonce, b32, counter, rounds);
+      core(sigma, key, nonce, b32, counter, rounds);
       if (counter >= MAX_COUNTER)
         throw new Error("arx: counter overflow");
       const take = Math.min(BLOCK_LEN, len - pos);
@@ -239,7 +291,7 @@ var nobleCiphers = (() => {
       }
       for (let j = 0, posj; j < take; j++) {
         posj = pos + j;
-        output2[posj] = data[posj] ^ block[j];
+        output[posj] = data[posj] ^ block[j];
       }
       pos += take;
     }
@@ -248,33 +300,35 @@ var nobleCiphers = (() => {
     const { allowShortKeys, extendNonceFn, counterLength, counterRight, rounds } = checkOpts({ allowShortKeys: false, counterLength: 8, counterRight: false, rounds: 20 }, opts);
     if (typeof core !== "function")
       throw new Error("core must be a function");
-    number(counterLength);
-    number(rounds);
-    bool(counterRight);
-    bool(allowShortKeys);
-    return (key, nonce, data, output2, counter = 0) => {
-      bytes(key);
-      bytes(nonce);
-      bytes(data);
+    anumber(counterLength);
+    anumber(rounds);
+    abool(counterRight);
+    abool(allowShortKeys);
+    return (key, nonce, data, output, counter = 0) => {
+      abytes(key);
+      abytes(nonce);
+      abytes(data);
       const len = data.length;
-      if (output2 === void 0)
-        output2 = new Uint8Array(len);
-      bytes(output2);
-      number(counter);
+      if (output === void 0)
+        output = new Uint8Array(len);
+      abytes(output);
+      anumber(counter);
       if (counter < 0 || counter >= MAX_COUNTER)
         throw new Error("arx: counter overflow");
-      if (output2.length < len)
-        throw new Error(`arx: output (${output2.length}) is shorter than data (${len})`);
+      if (output.length < len)
+        throw new Error(`arx: output (${output.length}) is shorter than data (${len})`);
       const toClean = [];
-      let l = key.length, k, sigma2;
+      let l = key.length;
+      let k;
+      let sigma;
       if (l === 32) {
         toClean.push(k = copyBytes(key));
-        sigma2 = sigma32_32;
+        sigma = sigma32_32;
       } else if (l === 16 && allowShortKeys) {
         k = new Uint8Array(32);
         k.set(key);
         k.set(key, 16);
-        sigma2 = sigma16_32;
+        sigma = sigma16_32;
         toClean.push(k);
       } else {
         throw new Error(`arx: invalid 32-byte key, got length=${l}`);
@@ -285,7 +339,7 @@ var nobleCiphers = (() => {
       if (extendNonceFn) {
         if (nonce.length !== 24)
           throw new Error(`arx: extended nonce must be 24 bytes`);
-        extendNonceFn(sigma2, k32, u32(nonce.subarray(0, 16)), k32);
+        extendNonceFn(sigma, k32, u32(nonce.subarray(0, 16)), k32);
         nonce = nonce.subarray(16);
       }
       const nonceNcLen = 16 - counterLength;
@@ -298,174 +352,367 @@ var nobleCiphers = (() => {
         toClean.push(nonce);
       }
       const n32 = u32(nonce);
-      runCipher(core, sigma2, k32, n32, data, output2, counter, rounds);
+      runCipher(core, sigma, k32, n32, data, output, counter, rounds);
       clean(...toClean);
-      return output2;
+      return output;
     };
   }
 
-  // ../esm/_micro.js
-  function bytesToNumberLE(bytes2) {
-    return hexToNumber(bytesToHex(Uint8Array.from(bytes2).reverse()));
-  }
-  function numberToBytesLE(n, len) {
-    return numberToBytesBE(n, len).reverse();
-  }
-  function salsaQR(x, a, b, c, d) {
-    x[b] ^= rotl(x[a] + x[d] | 0, 7);
-    x[c] ^= rotl(x[b] + x[a] | 0, 9);
-    x[d] ^= rotl(x[c] + x[b] | 0, 13);
-    x[a] ^= rotl(x[d] + x[c] | 0, 18);
-  }
-  function chachaQR(x, a, b, c, d) {
-    x[a] = x[a] + x[b] | 0;
-    x[d] = rotl(x[d] ^ x[a], 16);
-    x[c] = x[c] + x[d] | 0;
-    x[b] = rotl(x[b] ^ x[c], 12);
-    x[a] = x[a] + x[b] | 0;
-    x[d] = rotl(x[d] ^ x[a], 8);
-    x[c] = x[c] + x[d] | 0;
-    x[b] = rotl(x[b] ^ x[c], 7);
-  }
-  function salsaRound(x, rounds = 20) {
-    for (let r = 0; r < rounds; r += 2) {
-      salsaQR(x, 0, 4, 8, 12);
-      salsaQR(x, 5, 9, 13, 1);
-      salsaQR(x, 10, 14, 2, 6);
-      salsaQR(x, 15, 3, 7, 11);
-      salsaQR(x, 0, 1, 2, 3);
-      salsaQR(x, 5, 6, 7, 4);
-      salsaQR(x, 10, 11, 8, 9);
-      salsaQR(x, 15, 12, 13, 14);
+  // ../../esm/_poly1305.js
+  var u8to16 = (a, i) => a[i++] & 255 | (a[i++] & 255) << 8;
+  var Poly1305 = class {
+    constructor(key) {
+      this.blockLen = 16;
+      this.outputLen = 16;
+      this.buffer = new Uint8Array(16);
+      this.r = new Uint16Array(10);
+      this.h = new Uint16Array(10);
+      this.pad = new Uint16Array(8);
+      this.pos = 0;
+      this.finished = false;
+      key = toBytes(key);
+      abytes(key, 32);
+      const t0 = u8to16(key, 0);
+      const t1 = u8to16(key, 2);
+      const t2 = u8to16(key, 4);
+      const t3 = u8to16(key, 6);
+      const t4 = u8to16(key, 8);
+      const t5 = u8to16(key, 10);
+      const t6 = u8to16(key, 12);
+      const t7 = u8to16(key, 14);
+      this.r[0] = t0 & 8191;
+      this.r[1] = (t0 >>> 13 | t1 << 3) & 8191;
+      this.r[2] = (t1 >>> 10 | t2 << 6) & 7939;
+      this.r[3] = (t2 >>> 7 | t3 << 9) & 8191;
+      this.r[4] = (t3 >>> 4 | t4 << 12) & 255;
+      this.r[5] = t4 >>> 1 & 8190;
+      this.r[6] = (t4 >>> 14 | t5 << 2) & 8191;
+      this.r[7] = (t5 >>> 11 | t6 << 5) & 8065;
+      this.r[8] = (t6 >>> 8 | t7 << 8) & 8191;
+      this.r[9] = t7 >>> 5 & 127;
+      for (let i = 0; i < 8; i++)
+        this.pad[i] = u8to16(key, 16 + 2 * i);
     }
-  }
-  function chachaRound(x, rounds = 20) {
-    for (let r = 0; r < rounds; r += 2) {
-      chachaQR(x, 0, 4, 8, 12);
-      chachaQR(x, 1, 5, 9, 13);
-      chachaQR(x, 2, 6, 10, 14);
-      chachaQR(x, 3, 7, 11, 15);
-      chachaQR(x, 0, 5, 10, 15);
-      chachaQR(x, 1, 6, 11, 12);
-      chachaQR(x, 2, 7, 8, 13);
-      chachaQR(x, 3, 4, 9, 14);
+    process(data, offset, isLast = false) {
+      const hibit = isLast ? 0 : 1 << 11;
+      const { h, r } = this;
+      const r0 = r[0];
+      const r1 = r[1];
+      const r2 = r[2];
+      const r3 = r[3];
+      const r4 = r[4];
+      const r5 = r[5];
+      const r6 = r[6];
+      const r7 = r[7];
+      const r8 = r[8];
+      const r9 = r[9];
+      const t0 = u8to16(data, offset + 0);
+      const t1 = u8to16(data, offset + 2);
+      const t2 = u8to16(data, offset + 4);
+      const t3 = u8to16(data, offset + 6);
+      const t4 = u8to16(data, offset + 8);
+      const t5 = u8to16(data, offset + 10);
+      const t6 = u8to16(data, offset + 12);
+      const t7 = u8to16(data, offset + 14);
+      let h0 = h[0] + (t0 & 8191);
+      let h1 = h[1] + ((t0 >>> 13 | t1 << 3) & 8191);
+      let h2 = h[2] + ((t1 >>> 10 | t2 << 6) & 8191);
+      let h3 = h[3] + ((t2 >>> 7 | t3 << 9) & 8191);
+      let h4 = h[4] + ((t3 >>> 4 | t4 << 12) & 8191);
+      let h5 = h[5] + (t4 >>> 1 & 8191);
+      let h6 = h[6] + ((t4 >>> 14 | t5 << 2) & 8191);
+      let h7 = h[7] + ((t5 >>> 11 | t6 << 5) & 8191);
+      let h8 = h[8] + ((t6 >>> 8 | t7 << 8) & 8191);
+      let h9 = h[9] + (t7 >>> 5 | hibit);
+      let c = 0;
+      let d0 = c + h0 * r0 + h1 * (5 * r9) + h2 * (5 * r8) + h3 * (5 * r7) + h4 * (5 * r6);
+      c = d0 >>> 13;
+      d0 &= 8191;
+      d0 += h5 * (5 * r5) + h6 * (5 * r4) + h7 * (5 * r3) + h8 * (5 * r2) + h9 * (5 * r1);
+      c += d0 >>> 13;
+      d0 &= 8191;
+      let d1 = c + h0 * r1 + h1 * r0 + h2 * (5 * r9) + h3 * (5 * r8) + h4 * (5 * r7);
+      c = d1 >>> 13;
+      d1 &= 8191;
+      d1 += h5 * (5 * r6) + h6 * (5 * r5) + h7 * (5 * r4) + h8 * (5 * r3) + h9 * (5 * r2);
+      c += d1 >>> 13;
+      d1 &= 8191;
+      let d2 = c + h0 * r2 + h1 * r1 + h2 * r0 + h3 * (5 * r9) + h4 * (5 * r8);
+      c = d2 >>> 13;
+      d2 &= 8191;
+      d2 += h5 * (5 * r7) + h6 * (5 * r6) + h7 * (5 * r5) + h8 * (5 * r4) + h9 * (5 * r3);
+      c += d2 >>> 13;
+      d2 &= 8191;
+      let d3 = c + h0 * r3 + h1 * r2 + h2 * r1 + h3 * r0 + h4 * (5 * r9);
+      c = d3 >>> 13;
+      d3 &= 8191;
+      d3 += h5 * (5 * r8) + h6 * (5 * r7) + h7 * (5 * r6) + h8 * (5 * r5) + h9 * (5 * r4);
+      c += d3 >>> 13;
+      d3 &= 8191;
+      let d4 = c + h0 * r4 + h1 * r3 + h2 * r2 + h3 * r1 + h4 * r0;
+      c = d4 >>> 13;
+      d4 &= 8191;
+      d4 += h5 * (5 * r9) + h6 * (5 * r8) + h7 * (5 * r7) + h8 * (5 * r6) + h9 * (5 * r5);
+      c += d4 >>> 13;
+      d4 &= 8191;
+      let d5 = c + h0 * r5 + h1 * r4 + h2 * r3 + h3 * r2 + h4 * r1;
+      c = d5 >>> 13;
+      d5 &= 8191;
+      d5 += h5 * r0 + h6 * (5 * r9) + h7 * (5 * r8) + h8 * (5 * r7) + h9 * (5 * r6);
+      c += d5 >>> 13;
+      d5 &= 8191;
+      let d6 = c + h0 * r6 + h1 * r5 + h2 * r4 + h3 * r3 + h4 * r2;
+      c = d6 >>> 13;
+      d6 &= 8191;
+      d6 += h5 * r1 + h6 * r0 + h7 * (5 * r9) + h8 * (5 * r8) + h9 * (5 * r7);
+      c += d6 >>> 13;
+      d6 &= 8191;
+      let d7 = c + h0 * r7 + h1 * r6 + h2 * r5 + h3 * r4 + h4 * r3;
+      c = d7 >>> 13;
+      d7 &= 8191;
+      d7 += h5 * r2 + h6 * r1 + h7 * r0 + h8 * (5 * r9) + h9 * (5 * r8);
+      c += d7 >>> 13;
+      d7 &= 8191;
+      let d8 = c + h0 * r8 + h1 * r7 + h2 * r6 + h3 * r5 + h4 * r4;
+      c = d8 >>> 13;
+      d8 &= 8191;
+      d8 += h5 * r3 + h6 * r2 + h7 * r1 + h8 * r0 + h9 * (5 * r9);
+      c += d8 >>> 13;
+      d8 &= 8191;
+      let d9 = c + h0 * r9 + h1 * r8 + h2 * r7 + h3 * r6 + h4 * r5;
+      c = d9 >>> 13;
+      d9 &= 8191;
+      d9 += h5 * r4 + h6 * r3 + h7 * r2 + h8 * r1 + h9 * r0;
+      c += d9 >>> 13;
+      d9 &= 8191;
+      c = (c << 2) + c | 0;
+      c = c + d0 | 0;
+      d0 = c & 8191;
+      c = c >>> 13;
+      d1 += c;
+      h[0] = d0;
+      h[1] = d1;
+      h[2] = d2;
+      h[3] = d3;
+      h[4] = d4;
+      h[5] = d5;
+      h[6] = d6;
+      h[7] = d7;
+      h[8] = d8;
+      h[9] = d9;
     }
+    finalize() {
+      const { h, pad } = this;
+      const g = new Uint16Array(10);
+      let c = h[1] >>> 13;
+      h[1] &= 8191;
+      for (let i = 2; i < 10; i++) {
+        h[i] += c;
+        c = h[i] >>> 13;
+        h[i] &= 8191;
+      }
+      h[0] += c * 5;
+      c = h[0] >>> 13;
+      h[0] &= 8191;
+      h[1] += c;
+      c = h[1] >>> 13;
+      h[1] &= 8191;
+      h[2] += c;
+      g[0] = h[0] + 5;
+      c = g[0] >>> 13;
+      g[0] &= 8191;
+      for (let i = 1; i < 10; i++) {
+        g[i] = h[i] + c;
+        c = g[i] >>> 13;
+        g[i] &= 8191;
+      }
+      g[9] -= 1 << 13;
+      let mask = (c ^ 1) - 1;
+      for (let i = 0; i < 10; i++)
+        g[i] &= mask;
+      mask = ~mask;
+      for (let i = 0; i < 10; i++)
+        h[i] = h[i] & mask | g[i];
+      h[0] = (h[0] | h[1] << 13) & 65535;
+      h[1] = (h[1] >>> 3 | h[2] << 10) & 65535;
+      h[2] = (h[2] >>> 6 | h[3] << 7) & 65535;
+      h[3] = (h[3] >>> 9 | h[4] << 4) & 65535;
+      h[4] = (h[4] >>> 12 | h[5] << 1 | h[6] << 14) & 65535;
+      h[5] = (h[6] >>> 2 | h[7] << 11) & 65535;
+      h[6] = (h[7] >>> 5 | h[8] << 8) & 65535;
+      h[7] = (h[8] >>> 8 | h[9] << 5) & 65535;
+      let f = h[0] + pad[0];
+      h[0] = f & 65535;
+      for (let i = 1; i < 8; i++) {
+        f = (h[i] + pad[i] | 0) + (f >>> 16) | 0;
+        h[i] = f & 65535;
+      }
+      clean(g);
+    }
+    update(data) {
+      aexists(this);
+      const { buffer, blockLen } = this;
+      data = toBytes(data);
+      const len = data.length;
+      for (let pos = 0; pos < len; ) {
+        const take = Math.min(blockLen - this.pos, len - pos);
+        if (take === blockLen) {
+          for (; blockLen <= len - pos; pos += blockLen)
+            this.process(data, pos);
+          continue;
+        }
+        buffer.set(data.subarray(pos, pos + take), this.pos);
+        this.pos += take;
+        pos += take;
+        if (this.pos === blockLen) {
+          this.process(buffer, 0, false);
+          this.pos = 0;
+        }
+      }
+      return this;
+    }
+    destroy() {
+      clean(this.h, this.r, this.buffer, this.pad);
+    }
+    digestInto(out) {
+      aexists(this);
+      aoutput(out, this);
+      this.finished = true;
+      const { buffer, h } = this;
+      let { pos } = this;
+      if (pos) {
+        buffer[pos++] = 1;
+        for (; pos < 16; pos++)
+          buffer[pos] = 0;
+        this.process(buffer, 0, true);
+      }
+      this.finalize();
+      let opos = 0;
+      for (let i = 0; i < 8; i++) {
+        out[opos++] = h[i] >>> 0;
+        out[opos++] = h[i] >>> 8;
+      }
+      return out;
+    }
+    digest() {
+      const { buffer, outputLen } = this;
+      this.digestInto(buffer);
+      const res = buffer.slice(0, outputLen);
+      this.destroy();
+      return res;
+    }
+  };
+  function wrapConstructorWithKey(hashCons) {
+    const hashC = (msg, key) => hashCons(key).update(toBytes(msg)).digest();
+    const tmp = hashCons(new Uint8Array(32));
+    hashC.outputLen = tmp.outputLen;
+    hashC.blockLen = tmp.blockLen;
+    hashC.create = (key) => hashCons(key);
+    return hashC;
   }
+  var poly1305 = wrapConstructorWithKey((key) => new Poly1305(key));
+
+  // ../../esm/salsa.js
   function salsaCore(s, k, n, out, cnt, rounds = 20) {
-    const y = new Uint32Array([
-      s[0],
-      k[0],
-      k[1],
-      k[2],
-      // "expa" Key     Key     Key
-      k[3],
-      s[1],
-      n[0],
-      n[1],
-      // Key    "nd 3"  Nonce   Nonce
-      cnt,
-      0,
-      s[2],
-      k[4],
-      // Pos.   Pos.    "2-by"  Key
-      k[5],
-      k[6],
-      k[7],
-      s[3]
-      // Key    Key     Key     "te k"
-    ]);
-    const x = y.slice();
-    salsaRound(x, rounds);
-    for (let i = 0; i < 16; i++)
-      out[i] = y[i] + x[i] | 0;
+    let y00 = s[0], y01 = k[0], y02 = k[1], y03 = k[2], y04 = k[3], y05 = s[1], y06 = n[0], y07 = n[1], y08 = cnt, y09 = 0, y10 = s[2], y11 = k[4], y12 = k[5], y13 = k[6], y14 = k[7], y15 = s[3];
+    let x00 = y00, x01 = y01, x02 = y02, x03 = y03, x04 = y04, x05 = y05, x06 = y06, x07 = y07, x08 = y08, x09 = y09, x10 = y10, x11 = y11, x12 = y12, x13 = y13, x14 = y14, x15 = y15;
+    for (let r = 0; r < rounds; r += 2) {
+      x04 ^= rotl(x00 + x12 | 0, 7);
+      x08 ^= rotl(x04 + x00 | 0, 9);
+      x12 ^= rotl(x08 + x04 | 0, 13);
+      x00 ^= rotl(x12 + x08 | 0, 18);
+      x09 ^= rotl(x05 + x01 | 0, 7);
+      x13 ^= rotl(x09 + x05 | 0, 9);
+      x01 ^= rotl(x13 + x09 | 0, 13);
+      x05 ^= rotl(x01 + x13 | 0, 18);
+      x14 ^= rotl(x10 + x06 | 0, 7);
+      x02 ^= rotl(x14 + x10 | 0, 9);
+      x06 ^= rotl(x02 + x14 | 0, 13);
+      x10 ^= rotl(x06 + x02 | 0, 18);
+      x03 ^= rotl(x15 + x11 | 0, 7);
+      x07 ^= rotl(x03 + x15 | 0, 9);
+      x11 ^= rotl(x07 + x03 | 0, 13);
+      x15 ^= rotl(x11 + x07 | 0, 18);
+      x01 ^= rotl(x00 + x03 | 0, 7);
+      x02 ^= rotl(x01 + x00 | 0, 9);
+      x03 ^= rotl(x02 + x01 | 0, 13);
+      x00 ^= rotl(x03 + x02 | 0, 18);
+      x06 ^= rotl(x05 + x04 | 0, 7);
+      x07 ^= rotl(x06 + x05 | 0, 9);
+      x04 ^= rotl(x07 + x06 | 0, 13);
+      x05 ^= rotl(x04 + x07 | 0, 18);
+      x11 ^= rotl(x10 + x09 | 0, 7);
+      x08 ^= rotl(x11 + x10 | 0, 9);
+      x09 ^= rotl(x08 + x11 | 0, 13);
+      x10 ^= rotl(x09 + x08 | 0, 18);
+      x12 ^= rotl(x15 + x14 | 0, 7);
+      x13 ^= rotl(x12 + x15 | 0, 9);
+      x14 ^= rotl(x13 + x12 | 0, 13);
+      x15 ^= rotl(x14 + x13 | 0, 18);
+    }
+    let oi = 0;
+    out[oi++] = y00 + x00 | 0;
+    out[oi++] = y01 + x01 | 0;
+    out[oi++] = y02 + x02 | 0;
+    out[oi++] = y03 + x03 | 0;
+    out[oi++] = y04 + x04 | 0;
+    out[oi++] = y05 + x05 | 0;
+    out[oi++] = y06 + x06 | 0;
+    out[oi++] = y07 + x07 | 0;
+    out[oi++] = y08 + x08 | 0;
+    out[oi++] = y09 + x09 | 0;
+    out[oi++] = y10 + x10 | 0;
+    out[oi++] = y11 + x11 | 0;
+    out[oi++] = y12 + x12 | 0;
+    out[oi++] = y13 + x13 | 0;
+    out[oi++] = y14 + x14 | 0;
+    out[oi++] = y15 + x15 | 0;
   }
   function hsalsa(s, k, i, o32) {
-    const x = new Uint32Array([
-      s[0],
-      k[0],
-      k[1],
-      k[2],
-      k[3],
-      s[1],
-      i[0],
-      i[1],
-      i[2],
-      i[3],
-      s[2],
-      k[4],
-      k[5],
-      k[6],
-      k[7],
-      s[3]
-    ]);
-    salsaRound(x, 20);
+    let x00 = s[0], x01 = k[0], x02 = k[1], x03 = k[2], x04 = k[3], x05 = s[1], x06 = i[0], x07 = i[1], x08 = i[2], x09 = i[3], x10 = s[2], x11 = k[4], x12 = k[5], x13 = k[6], x14 = k[7], x15 = s[3];
+    for (let r = 0; r < 20; r += 2) {
+      x04 ^= rotl(x00 + x12 | 0, 7);
+      x08 ^= rotl(x04 + x00 | 0, 9);
+      x12 ^= rotl(x08 + x04 | 0, 13);
+      x00 ^= rotl(x12 + x08 | 0, 18);
+      x09 ^= rotl(x05 + x01 | 0, 7);
+      x13 ^= rotl(x09 + x05 | 0, 9);
+      x01 ^= rotl(x13 + x09 | 0, 13);
+      x05 ^= rotl(x01 + x13 | 0, 18);
+      x14 ^= rotl(x10 + x06 | 0, 7);
+      x02 ^= rotl(x14 + x10 | 0, 9);
+      x06 ^= rotl(x02 + x14 | 0, 13);
+      x10 ^= rotl(x06 + x02 | 0, 18);
+      x03 ^= rotl(x15 + x11 | 0, 7);
+      x07 ^= rotl(x03 + x15 | 0, 9);
+      x11 ^= rotl(x07 + x03 | 0, 13);
+      x15 ^= rotl(x11 + x07 | 0, 18);
+      x01 ^= rotl(x00 + x03 | 0, 7);
+      x02 ^= rotl(x01 + x00 | 0, 9);
+      x03 ^= rotl(x02 + x01 | 0, 13);
+      x00 ^= rotl(x03 + x02 | 0, 18);
+      x06 ^= rotl(x05 + x04 | 0, 7);
+      x07 ^= rotl(x06 + x05 | 0, 9);
+      x04 ^= rotl(x07 + x06 | 0, 13);
+      x05 ^= rotl(x04 + x07 | 0, 18);
+      x11 ^= rotl(x10 + x09 | 0, 7);
+      x08 ^= rotl(x11 + x10 | 0, 9);
+      x09 ^= rotl(x08 + x11 | 0, 13);
+      x10 ^= rotl(x09 + x08 | 0, 18);
+      x12 ^= rotl(x15 + x14 | 0, 7);
+      x13 ^= rotl(x12 + x15 | 0, 9);
+      x14 ^= rotl(x13 + x12 | 0, 13);
+      x15 ^= rotl(x14 + x13 | 0, 18);
+    }
     let oi = 0;
-    o32[oi++] = x[0];
-    o32[oi++] = x[5];
-    o32[oi++] = x[10];
-    o32[oi++] = x[15];
-    o32[oi++] = x[6];
-    o32[oi++] = x[7];
-    o32[oi++] = x[8];
-    o32[oi++] = x[9];
-  }
-  function chachaCore(s, k, n, out, cnt, rounds = 20) {
-    const y = new Uint32Array([
-      s[0],
-      s[1],
-      s[2],
-      s[3],
-      // "expa"   "nd 3"  "2-by"  "te k"
-      k[0],
-      k[1],
-      k[2],
-      k[3],
-      // Key      Key     Key     Key
-      k[4],
-      k[5],
-      k[6],
-      k[7],
-      // Key      Key     Key     Key
-      cnt,
-      n[0],
-      n[1],
-      n[2]
-      // Counter  Counter Nonce   Nonce
-    ]);
-    const x = y.slice();
-    chachaRound(x, rounds);
-    for (let i = 0; i < 16; i++)
-      out[i] = y[i] + x[i] | 0;
-  }
-  function hchacha(s, k, i, o32) {
-    const x = new Uint32Array([
-      s[0],
-      s[1],
-      s[2],
-      s[3],
-      k[0],
-      k[1],
-      k[2],
-      k[3],
-      k[4],
-      k[5],
-      k[6],
-      k[7],
-      i[0],
-      i[1],
-      i[2],
-      i[3]
-    ]);
-    chachaRound(x, 20);
-    let oi = 0;
-    o32[oi++] = x[0];
-    o32[oi++] = x[1];
-    o32[oi++] = x[2];
-    o32[oi++] = x[3];
-    o32[oi++] = x[12];
-    o32[oi++] = x[13];
-    o32[oi++] = x[14];
-    o32[oi++] = x[15];
+    o32[oi++] = x00;
+    o32[oi++] = x05;
+    o32[oi++] = x10;
+    o32[oi++] = x15;
+    o32[oi++] = x06;
+    o32[oi++] = x07;
+    o32[oi++] = x08;
+    o32[oi++] = x09;
   }
   var salsa20 = /* @__PURE__ */ createCipher(salsaCore, {
     allowShortKeys: true,
@@ -475,14 +722,215 @@ var nobleCiphers = (() => {
     counterRight: true,
     extendNonceFn: hsalsa
   });
+  var xsalsa20poly1305 = /* @__PURE__ */ wrapCipher({ blockSize: 64, nonceLength: 24, tagLength: 16 }, (key, nonce) => {
+    return {
+      encrypt(plaintext, output) {
+        output = getOutput(plaintext.length + 32, output, false);
+        const authKey = output.subarray(0, 32);
+        const ciphPlaintext = output.subarray(32);
+        output.set(plaintext, 32);
+        clean(authKey);
+        xsalsa20(key, nonce, output, output);
+        const tag = poly1305(ciphPlaintext, authKey);
+        output.set(tag, 16);
+        clean(output.subarray(0, 16), tag);
+        return output.subarray(16);
+      },
+      decrypt(ciphertext, output) {
+        abytes(ciphertext);
+        output = getOutput(ciphertext.length + 32, output, false);
+        const tmp = output.subarray(0, 32);
+        const passedTag = output.subarray(32, 48);
+        const ciphPlaintext = output.subarray(48);
+        output.set(ciphertext, 32);
+        clean(tmp);
+        const authKey = xsalsa20(key, nonce, tmp, tmp);
+        const tag = poly1305(ciphPlaintext, authKey);
+        if (!equalBytes(passedTag, tag))
+          throw new Error("invalid tag");
+        xsalsa20(key, nonce, output.subarray(16), output.subarray(16));
+        clean(tmp, passedTag, tag);
+        return ciphPlaintext;
+      }
+    };
+  });
+
+  // ../../esm/chacha.js
+  function chachaCore(s, k, n, out, cnt, rounds = 20) {
+    let y00 = s[0], y01 = s[1], y02 = s[2], y03 = s[3], y04 = k[0], y05 = k[1], y06 = k[2], y07 = k[3], y08 = k[4], y09 = k[5], y10 = k[6], y11 = k[7], y12 = cnt, y13 = n[0], y14 = n[1], y15 = n[2];
+    let x00 = y00, x01 = y01, x02 = y02, x03 = y03, x04 = y04, x05 = y05, x06 = y06, x07 = y07, x08 = y08, x09 = y09, x10 = y10, x11 = y11, x12 = y12, x13 = y13, x14 = y14, x15 = y15;
+    for (let r = 0; r < rounds; r += 2) {
+      x00 = x00 + x04 | 0;
+      x12 = rotl(x12 ^ x00, 16);
+      x08 = x08 + x12 | 0;
+      x04 = rotl(x04 ^ x08, 12);
+      x00 = x00 + x04 | 0;
+      x12 = rotl(x12 ^ x00, 8);
+      x08 = x08 + x12 | 0;
+      x04 = rotl(x04 ^ x08, 7);
+      x01 = x01 + x05 | 0;
+      x13 = rotl(x13 ^ x01, 16);
+      x09 = x09 + x13 | 0;
+      x05 = rotl(x05 ^ x09, 12);
+      x01 = x01 + x05 | 0;
+      x13 = rotl(x13 ^ x01, 8);
+      x09 = x09 + x13 | 0;
+      x05 = rotl(x05 ^ x09, 7);
+      x02 = x02 + x06 | 0;
+      x14 = rotl(x14 ^ x02, 16);
+      x10 = x10 + x14 | 0;
+      x06 = rotl(x06 ^ x10, 12);
+      x02 = x02 + x06 | 0;
+      x14 = rotl(x14 ^ x02, 8);
+      x10 = x10 + x14 | 0;
+      x06 = rotl(x06 ^ x10, 7);
+      x03 = x03 + x07 | 0;
+      x15 = rotl(x15 ^ x03, 16);
+      x11 = x11 + x15 | 0;
+      x07 = rotl(x07 ^ x11, 12);
+      x03 = x03 + x07 | 0;
+      x15 = rotl(x15 ^ x03, 8);
+      x11 = x11 + x15 | 0;
+      x07 = rotl(x07 ^ x11, 7);
+      x00 = x00 + x05 | 0;
+      x15 = rotl(x15 ^ x00, 16);
+      x10 = x10 + x15 | 0;
+      x05 = rotl(x05 ^ x10, 12);
+      x00 = x00 + x05 | 0;
+      x15 = rotl(x15 ^ x00, 8);
+      x10 = x10 + x15 | 0;
+      x05 = rotl(x05 ^ x10, 7);
+      x01 = x01 + x06 | 0;
+      x12 = rotl(x12 ^ x01, 16);
+      x11 = x11 + x12 | 0;
+      x06 = rotl(x06 ^ x11, 12);
+      x01 = x01 + x06 | 0;
+      x12 = rotl(x12 ^ x01, 8);
+      x11 = x11 + x12 | 0;
+      x06 = rotl(x06 ^ x11, 7);
+      x02 = x02 + x07 | 0;
+      x13 = rotl(x13 ^ x02, 16);
+      x08 = x08 + x13 | 0;
+      x07 = rotl(x07 ^ x08, 12);
+      x02 = x02 + x07 | 0;
+      x13 = rotl(x13 ^ x02, 8);
+      x08 = x08 + x13 | 0;
+      x07 = rotl(x07 ^ x08, 7);
+      x03 = x03 + x04 | 0;
+      x14 = rotl(x14 ^ x03, 16);
+      x09 = x09 + x14 | 0;
+      x04 = rotl(x04 ^ x09, 12);
+      x03 = x03 + x04 | 0;
+      x14 = rotl(x14 ^ x03, 8);
+      x09 = x09 + x14 | 0;
+      x04 = rotl(x04 ^ x09, 7);
+    }
+    let oi = 0;
+    out[oi++] = y00 + x00 | 0;
+    out[oi++] = y01 + x01 | 0;
+    out[oi++] = y02 + x02 | 0;
+    out[oi++] = y03 + x03 | 0;
+    out[oi++] = y04 + x04 | 0;
+    out[oi++] = y05 + x05 | 0;
+    out[oi++] = y06 + x06 | 0;
+    out[oi++] = y07 + x07 | 0;
+    out[oi++] = y08 + x08 | 0;
+    out[oi++] = y09 + x09 | 0;
+    out[oi++] = y10 + x10 | 0;
+    out[oi++] = y11 + x11 | 0;
+    out[oi++] = y12 + x12 | 0;
+    out[oi++] = y13 + x13 | 0;
+    out[oi++] = y14 + x14 | 0;
+    out[oi++] = y15 + x15 | 0;
+  }
+  function hchacha(s, k, i, o32) {
+    let x00 = s[0], x01 = s[1], x02 = s[2], x03 = s[3], x04 = k[0], x05 = k[1], x06 = k[2], x07 = k[3], x08 = k[4], x09 = k[5], x10 = k[6], x11 = k[7], x12 = i[0], x13 = i[1], x14 = i[2], x15 = i[3];
+    for (let r = 0; r < 20; r += 2) {
+      x00 = x00 + x04 | 0;
+      x12 = rotl(x12 ^ x00, 16);
+      x08 = x08 + x12 | 0;
+      x04 = rotl(x04 ^ x08, 12);
+      x00 = x00 + x04 | 0;
+      x12 = rotl(x12 ^ x00, 8);
+      x08 = x08 + x12 | 0;
+      x04 = rotl(x04 ^ x08, 7);
+      x01 = x01 + x05 | 0;
+      x13 = rotl(x13 ^ x01, 16);
+      x09 = x09 + x13 | 0;
+      x05 = rotl(x05 ^ x09, 12);
+      x01 = x01 + x05 | 0;
+      x13 = rotl(x13 ^ x01, 8);
+      x09 = x09 + x13 | 0;
+      x05 = rotl(x05 ^ x09, 7);
+      x02 = x02 + x06 | 0;
+      x14 = rotl(x14 ^ x02, 16);
+      x10 = x10 + x14 | 0;
+      x06 = rotl(x06 ^ x10, 12);
+      x02 = x02 + x06 | 0;
+      x14 = rotl(x14 ^ x02, 8);
+      x10 = x10 + x14 | 0;
+      x06 = rotl(x06 ^ x10, 7);
+      x03 = x03 + x07 | 0;
+      x15 = rotl(x15 ^ x03, 16);
+      x11 = x11 + x15 | 0;
+      x07 = rotl(x07 ^ x11, 12);
+      x03 = x03 + x07 | 0;
+      x15 = rotl(x15 ^ x03, 8);
+      x11 = x11 + x15 | 0;
+      x07 = rotl(x07 ^ x11, 7);
+      x00 = x00 + x05 | 0;
+      x15 = rotl(x15 ^ x00, 16);
+      x10 = x10 + x15 | 0;
+      x05 = rotl(x05 ^ x10, 12);
+      x00 = x00 + x05 | 0;
+      x15 = rotl(x15 ^ x00, 8);
+      x10 = x10 + x15 | 0;
+      x05 = rotl(x05 ^ x10, 7);
+      x01 = x01 + x06 | 0;
+      x12 = rotl(x12 ^ x01, 16);
+      x11 = x11 + x12 | 0;
+      x06 = rotl(x06 ^ x11, 12);
+      x01 = x01 + x06 | 0;
+      x12 = rotl(x12 ^ x01, 8);
+      x11 = x11 + x12 | 0;
+      x06 = rotl(x06 ^ x11, 7);
+      x02 = x02 + x07 | 0;
+      x13 = rotl(x13 ^ x02, 16);
+      x08 = x08 + x13 | 0;
+      x07 = rotl(x07 ^ x08, 12);
+      x02 = x02 + x07 | 0;
+      x13 = rotl(x13 ^ x02, 8);
+      x08 = x08 + x13 | 0;
+      x07 = rotl(x07 ^ x08, 7);
+      x03 = x03 + x04 | 0;
+      x14 = rotl(x14 ^ x03, 16);
+      x09 = x09 + x14 | 0;
+      x04 = rotl(x04 ^ x09, 12);
+      x03 = x03 + x04 | 0;
+      x14 = rotl(x14 ^ x03, 8);
+      x09 = x09 + x14 | 0;
+      x04 = rotl(x04 ^ x09, 7);
+    }
+    let oi = 0;
+    o32[oi++] = x00;
+    o32[oi++] = x01;
+    o32[oi++] = x02;
+    o32[oi++] = x03;
+    o32[oi++] = x12;
+    o32[oi++] = x13;
+    o32[oi++] = x14;
+    o32[oi++] = x15;
+  }
   var chacha20 = /* @__PURE__ */ createCipher(chachaCore, {
     counterRight: false,
-    counterLength: 4
+    counterLength: 4,
+    allowShortKeys: false
   });
   var xchacha20 = /* @__PURE__ */ createCipher(chachaCore, {
     counterRight: false,
     counterLength: 8,
-    extendNonceFn: hchacha
+    extendNonceFn: hchacha,
+    allowShortKeys: false
   });
   var chacha8 = /* @__PURE__ */ createCipher(chachaCore, {
     counterRight: false,
@@ -494,103 +942,64 @@ var nobleCiphers = (() => {
     counterLength: 4,
     rounds: 12
   });
-  var POW_2_130_5 = BigInt(2) ** BigInt(130) - BigInt(5);
-  var POW_2_128_1 = BigInt(2) ** BigInt(16 * 8) - BigInt(1);
-  var CLAMP_R = BigInt("0x0ffffffc0ffffffc0ffffffc0fffffff");
-  var _0 = BigInt(0);
-  var _1 = BigInt(1);
-  function poly1305(msg, key) {
-    bytes(msg);
-    bytes(key);
-    let acc = _0;
-    const r = bytesToNumberLE(key.subarray(0, 16)) & CLAMP_R;
-    const s = bytesToNumberLE(key.subarray(16));
-    for (let i = 0; i < msg.length; i += 16) {
-      const m = msg.subarray(i, i + 16);
-      const n = bytesToNumberLE(m) | _1 << BigInt(8 * m.length);
-      acc = (acc + n) * r % POW_2_130_5;
-    }
-    const res = acc + s & POW_2_128_1;
-    return numberToBytesLE(res, 16);
-  }
-  function computeTag(fn, key, nonce, ciphertext, AAD) {
-    const res = [];
-    if (AAD) {
-      res.push(AAD);
-      const leftover2 = AAD.length % 16;
-      if (leftover2 > 0)
-        res.push(new Uint8Array(16 - leftover2));
-    }
-    res.push(ciphertext);
-    const leftover = ciphertext.length % 16;
-    if (leftover > 0)
-      res.push(new Uint8Array(16 - leftover));
+  var ZEROS16 = /* @__PURE__ */ new Uint8Array(16);
+  var updatePadded = (h, msg) => {
+    h.update(msg);
+    const left = msg.length % 16;
+    if (left)
+      h.update(ZEROS16.subarray(left));
+  };
+  var ZEROS32 = /* @__PURE__ */ new Uint8Array(32);
+  function computeTag(fn, key, nonce, data, AAD) {
+    const authKey = fn(key, nonce, ZEROS32);
+    const h = poly1305.create(authKey);
+    if (AAD)
+      updatePadded(h, AAD);
+    updatePadded(h, data);
     const num = new Uint8Array(16);
     const view = createView(num);
     setBigUint64(view, 0, BigInt(AAD ? AAD.length : 0), true);
-    setBigUint64(view, 8, BigInt(ciphertext.length), true);
-    res.push(num);
-    const authKey = fn(key, nonce, new Uint8Array(32));
-    return poly1305(concatBytes(...res), authKey);
+    setBigUint64(view, 8, BigInt(data.length), true);
+    h.update(num);
+    const res = h.digest();
+    clean(authKey, num);
+    return res;
   }
-  var xsalsa20poly1305 = /* @__PURE__ */ wrapCipher({ blockSize: 64, nonceLength: 24, tagLength: 16 }, function xsalsa20poly13052(key, nonce) {
-    bytes(key);
-    bytes(nonce);
-    return {
-      encrypt(plaintext) {
-        bytes(plaintext);
-        const m = concatBytes(new Uint8Array(32), plaintext);
-        const c = xsalsa20(key, nonce, m);
-        const authKey = c.subarray(0, 32);
-        const data = c.subarray(32);
-        const tag = poly1305(data, authKey);
-        return concatBytes(tag, data);
-      },
-      decrypt(ciphertext) {
-        bytes(ciphertext);
-        if (ciphertext.length < 16)
-          throw new Error("encrypted data must be at least 16 bytes");
-        const c = concatBytes(new Uint8Array(16), ciphertext);
-        const authKey = xsalsa20(key, nonce, new Uint8Array(32));
-        const tag = poly1305(c.subarray(32), authKey);
-        if (!equalBytes(c.subarray(16, 32), tag))
-          throw new Error("invalid poly1305 tag");
-        return xsalsa20(key, nonce, c).subarray(32);
-      }
-    };
-  });
-  var _poly1305_aead = (fn) => (key, nonce, AAD) => {
+  var _poly1305_aead = (xorStream) => (key, nonce, AAD) => {
     const tagLength = 16;
-    const keyLength = 32;
-    bytes(key, keyLength);
-    bytes(nonce);
     return {
-      encrypt(plaintext) {
-        bytes(plaintext);
-        const res = fn(key, nonce, plaintext, void 0, 1);
-        const tag = computeTag(fn, key, nonce, res, AAD);
-        return concatBytes(res, tag);
+      encrypt(plaintext, output) {
+        const plength = plaintext.length;
+        output = getOutput(plength + tagLength, output, false);
+        output.set(plaintext);
+        const oPlain = output.subarray(0, -tagLength);
+        xorStream(key, nonce, oPlain, oPlain, 1);
+        const tag = computeTag(xorStream, key, nonce, oPlain, AAD);
+        output.set(tag, plength);
+        clean(tag);
+        return output;
       },
-      decrypt(ciphertext) {
-        bytes(ciphertext);
-        if (ciphertext.length < tagLength)
-          throw new Error(`encrypted data must be at least ${tagLength} bytes`);
-        const passedTag = ciphertext.subarray(-tagLength);
+      decrypt(ciphertext, output) {
+        output = getOutput(ciphertext.length - tagLength, output, false);
         const data = ciphertext.subarray(0, -tagLength);
-        const tag = computeTag(fn, key, nonce, data, AAD);
+        const passedTag = ciphertext.subarray(-tagLength);
+        const tag = computeTag(xorStream, key, nonce, data, AAD);
         if (!equalBytes(passedTag, tag))
-          throw new Error("invalid poly1305 tag");
-        return fn(key, nonce, data, void 0, 1);
+          throw new Error("invalid tag");
+        output.set(ciphertext.subarray(0, -tagLength));
+        xorStream(key, nonce, output, output, 1);
+        clean(tag);
+        return output;
       }
     };
   };
   var chacha20poly1305 = /* @__PURE__ */ wrapCipher({ blockSize: 64, nonceLength: 12, tagLength: 16 }, _poly1305_aead(chacha20));
   var xchacha20poly1305 = /* @__PURE__ */ wrapCipher({ blockSize: 64, nonceLength: 24, tagLength: 16 }, _poly1305_aead(xchacha20));
 
-  // ../esm/_polyval.js
+  // ../../esm/_polyval.js
   var BLOCK_SIZE = 16;
-  var ZEROS16 = /* @__PURE__ */ new Uint8Array(16);
-  var ZEROS32 = u32(ZEROS16);
+  var ZEROS162 = /* @__PURE__ */ new Uint8Array(16);
+  var ZEROS322 = u32(ZEROS162);
   var POLY = 225;
   var mul2 = (s0, s1, s2, s3) => {
     const hiBit = s3 & 1;
@@ -615,10 +1024,10 @@ var nobleCiphers = (() => {
     k[0] ^= -hiBit & 225;
     return k;
   }
-  var estimateWindow = (bytes2) => {
-    if (bytes2 > 64 * 1024)
+  var estimateWindow = (bytes) => {
+    if (bytes > 64 * 1024)
       return 8;
-    if (bytes2 > 1024)
+    if (bytes > 1024)
       return 4;
     return 2;
   };
@@ -633,7 +1042,7 @@ var nobleCiphers = (() => {
       this.s3 = 0;
       this.finished = false;
       key = toBytes(key);
-      bytes(key, 16);
+      abytes(key, 16);
       const kView = createView(key);
       let k0 = kView.getUint32(0, false);
       let k1 = kView.getUint32(4, false);
@@ -646,7 +1055,7 @@ var nobleCiphers = (() => {
       }
       const W = estimateWindow(expectedLength || 1024);
       if (![1, 2, 4, 8].includes(W))
-        throw new Error(`ghash: wrong window size=${W}, should be 2, 4 or 8`);
+        throw new Error("ghash: invalid window size, expected 2, 4 or 8");
       this.W = W;
       const bits = 128;
       const windows = bits / W;
@@ -691,7 +1100,7 @@ var nobleCiphers = (() => {
     }
     update(data) {
       data = toBytes(data);
-      exists(this);
+      aexists(this);
       const b32 = u32(data);
       const blocks = Math.floor(data.length / BLOCK_SIZE);
       const left = data.length % BLOCK_SIZE;
@@ -699,9 +1108,9 @@ var nobleCiphers = (() => {
         this._updateBlock(b32[i * 4 + 0], b32[i * 4 + 1], b32[i * 4 + 2], b32[i * 4 + 3]);
       }
       if (left) {
-        ZEROS16.set(data.subarray(blocks * BLOCK_SIZE));
-        this._updateBlock(ZEROS32[0], ZEROS32[1], ZEROS32[2], ZEROS32[3]);
-        clean(ZEROS32);
+        ZEROS162.set(data.subarray(blocks * BLOCK_SIZE));
+        this._updateBlock(ZEROS322[0], ZEROS322[1], ZEROS322[2], ZEROS322[3]);
+        clean(ZEROS322);
       }
       return this;
     }
@@ -712,8 +1121,8 @@ var nobleCiphers = (() => {
       }
     }
     digestInto(out) {
-      exists(this);
-      output(out, this);
+      aexists(this);
+      aoutput(out, this);
       this.finished = true;
       const { s0, s1, s2, s3 } = this;
       const o32 = u32(out);
@@ -739,7 +1148,7 @@ var nobleCiphers = (() => {
     }
     update(data) {
       data = toBytes(data);
-      exists(this);
+      aexists(this);
       const b32 = u32(data);
       const left = data.length % BLOCK_SIZE;
       const blocks = Math.floor(data.length / BLOCK_SIZE);
@@ -747,15 +1156,15 @@ var nobleCiphers = (() => {
         this._updateBlock(swapLE(b32[i * 4 + 3]), swapLE(b32[i * 4 + 2]), swapLE(b32[i * 4 + 1]), swapLE(b32[i * 4 + 0]));
       }
       if (left) {
-        ZEROS16.set(data.subarray(blocks * BLOCK_SIZE));
-        this._updateBlock(swapLE(ZEROS32[3]), swapLE(ZEROS32[2]), swapLE(ZEROS32[1]), swapLE(ZEROS32[0]));
-        clean(ZEROS32);
+        ZEROS162.set(data.subarray(blocks * BLOCK_SIZE));
+        this._updateBlock(swapLE(ZEROS322[3]), swapLE(ZEROS322[2]), swapLE(ZEROS322[1]), swapLE(ZEROS322[0]));
+        clean(ZEROS322);
       }
       return this;
     }
     digestInto(out) {
-      exists(this);
-      output(out, this);
+      aexists(this);
+      aoutput(out, this);
       this.finished = true;
       const { s0, s1, s2, s3 } = this;
       const o32 = u32(out);
@@ -766,7 +1175,7 @@ var nobleCiphers = (() => {
       return out.reverse();
     }
   };
-  function wrapConstructorWithKey(hashCons) {
+  function wrapConstructorWithKey2(hashCons) {
     const hashC = (msg, key) => hashCons(key, msg.length).update(toBytes(msg)).digest();
     const tmp = hashCons(new Uint8Array(16), 0);
     hashC.outputLen = tmp.outputLen;
@@ -774,13 +1183,13 @@ var nobleCiphers = (() => {
     hashC.create = (key, expectedLength) => hashCons(key, expectedLength);
     return hashC;
   }
-  var ghash = wrapConstructorWithKey((key, expectedLength) => new GHASH(key, expectedLength));
-  var polyval = wrapConstructorWithKey((key, expectedLength) => new Polyval(key, expectedLength));
+  var ghash = wrapConstructorWithKey2((key, expectedLength) => new GHASH(key, expectedLength));
+  var polyval = wrapConstructorWithKey2((key, expectedLength) => new Polyval(key, expectedLength));
 
-  // ../esm/aes.js
+  // ../../esm/aes.js
   var BLOCK_SIZE2 = 16;
   var BLOCK_SIZE32 = 4;
-  var EMPTY_BLOCK = new Uint8Array(BLOCK_SIZE2);
+  var EMPTY_BLOCK = /* @__PURE__ */ new Uint8Array(BLOCK_SIZE2);
   var POLY2 = 283;
   function mul22(n) {
     return n << 1 ^ POLY2 & -(n >> 7);
@@ -840,10 +1249,10 @@ var nobleCiphers = (() => {
     return p;
   })();
   function expandKeyLE(key) {
-    bytes(key);
+    abytes(key);
     const len = key.length;
     if (![16, 24, 32].includes(len))
-      throw new Error(`aes: wrong key size: should be 16, 24 or 32, got: ${len}`);
+      throw new Error("aes: invalid key size, should be 16, 24 or 32, got " + len);
     const { sbox2 } = tableEncoding;
     const toClean = [];
     if (!isAligned32(key))
@@ -924,23 +1333,14 @@ var nobleCiphers = (() => {
     const t3 = xk[k++] ^ applySbox(sbox2, s3, s2, s1, s0);
     return { s0: t0, s1: t1, s2: t2, s3: t3 };
   }
-  function getDst(len, dst) {
-    if (dst === void 0)
-      return new Uint8Array(len);
-    bytes(dst);
-    if (dst.length < len)
-      throw new Error(`aes: wrong destination length, expected at least ${len}, got: ${dst.length}`);
-    if (!isAligned32(dst))
-      throw new Error("unaligned dst");
-    return dst;
-  }
   function ctrCounter(xk, nonce, src, dst) {
-    bytes(nonce, BLOCK_SIZE2);
-    bytes(src);
+    abytes(nonce, BLOCK_SIZE2);
+    abytes(src);
     const srcLen = src.length;
-    dst = getDst(srcLen, dst);
-    const ctr4 = nonce;
-    const c32 = u32(ctr4);
+    dst = getOutput(srcLen, dst);
+    complexOverlapBytes(src, dst);
+    const ctr2 = nonce;
+    const c32 = u32(ctr2);
     let { s0, s1, s2, s3 } = encrypt(xk, c32[0], c32[1], c32[2], c32[3]);
     const src32 = u32(src);
     const dst32 = u32(dst);
@@ -950,9 +1350,9 @@ var nobleCiphers = (() => {
       dst32[i + 2] = src32[i + 2] ^ s2;
       dst32[i + 3] = src32[i + 3] ^ s3;
       let carry = 1;
-      for (let i2 = ctr4.length - 1; i2 >= 0; i2--) {
-        carry = carry + (ctr4[i2] & 255) | 0;
-        ctr4[i2] = carry & 255;
+      for (let i2 = ctr2.length - 1; i2 >= 0; i2--) {
+        carry = carry + (ctr2[i2] & 255) | 0;
+        ctr2[i2] = carry & 255;
         carry >>>= 8;
       }
       ({ s0, s1, s2, s3 } = encrypt(xk, c32[0], c32[1], c32[2], c32[3]));
@@ -968,12 +1368,12 @@ var nobleCiphers = (() => {
     return dst;
   }
   function ctr32(xk, isLE2, nonce, src, dst) {
-    bytes(nonce, BLOCK_SIZE2);
-    bytes(src);
-    dst = getDst(src.length, dst);
-    const ctr4 = nonce;
-    const c32 = u32(ctr4);
-    const view = createView(ctr4);
+    abytes(nonce, BLOCK_SIZE2);
+    abytes(src);
+    dst = getOutput(src.length, dst);
+    const ctr2 = nonce;
+    const c32 = u32(ctr2);
+    const view = createView(ctr2);
     const src32 = u32(src);
     const dst32 = u32(dst);
     const ctrPos = isLE2 ? 0 : 12;
@@ -999,13 +1399,11 @@ var nobleCiphers = (() => {
     }
     return dst;
   }
-  var ctr = wrapCipher({ blockSize: 16, nonceLength: 16 }, function ctr2(key, nonce) {
-    bytes(key);
-    bytes(nonce, BLOCK_SIZE2);
+  var ctr = /* @__PURE__ */ wrapCipher({ blockSize: 16, nonceLength: 16 }, function aesctr(key, nonce) {
     function processCtr(buf, dst) {
-      bytes(buf);
+      abytes(buf);
       if (dst !== void 0) {
-        bytes(dst);
+        abytes(dst);
         if (!isAligned32(dst))
           throw new Error("unaligned destination");
       }
@@ -1024,13 +1422,13 @@ var nobleCiphers = (() => {
     };
   });
   function validateBlockDecrypt(data) {
-    bytes(data);
+    abytes(data);
     if (data.length % BLOCK_SIZE2 !== 0) {
-      throw new Error(`aes/(cbc-ecb).decrypt ciphertext should consist of blocks with size ${BLOCK_SIZE2}`);
+      throw new Error("aes-(cbc/ecb).decrypt ciphertext should consist of blocks with size " + BLOCK_SIZE2);
     }
   }
   function validateBlockEncrypt(plaintext, pcks5, dst) {
-    bytes(plaintext);
+    abytes(plaintext);
     let outLen = plaintext.length;
     const remaining = outLen % BLOCK_SIZE2;
     if (!pcks5 && remaining !== 0)
@@ -1044,9 +1442,10 @@ var nobleCiphers = (() => {
         left = BLOCK_SIZE2;
       outLen = outLen + left;
     }
-    const out = getDst(outLen, dst);
-    const o = u32(out);
-    return { b, o, out };
+    dst = getOutput(outLen, dst);
+    complexOverlapBytes(plaintext, dst);
+    const o = u32(dst);
+    return { b, o, out: dst };
   }
   function validatePCKS(data, pcks5) {
     if (!pcks5)
@@ -1072,8 +1471,7 @@ var nobleCiphers = (() => {
       tmp[i] = paddingByte;
     return tmp32;
   }
-  var ecb = wrapCipher({ blockSize: 16 }, function ecb2(key, opts = {}) {
-    bytes(key);
+  var ecb = /* @__PURE__ */ wrapCipher({ blockSize: 16 }, function aesecb(key, opts = {}) {
     const pcks5 = !opts.disablePadding;
     return {
       encrypt(plaintext, dst) {
@@ -1095,24 +1493,23 @@ var nobleCiphers = (() => {
       decrypt(ciphertext, dst) {
         validateBlockDecrypt(ciphertext);
         const xk = expandKeyDecLE(key);
-        const out = getDst(ciphertext.length, dst);
+        dst = getOutput(ciphertext.length, dst);
         const toClean = [xk];
         if (!isAligned32(ciphertext))
           toClean.push(ciphertext = copyBytes(ciphertext));
+        complexOverlapBytes(ciphertext, dst);
         const b = u32(ciphertext);
-        const o = u32(out);
+        const o = u32(dst);
         for (let i = 0; i + 4 <= b.length; ) {
           const { s0, s1, s2, s3 } = decrypt(xk, b[i + 0], b[i + 1], b[i + 2], b[i + 3]);
           o[i++] = s0, o[i++] = s1, o[i++] = s2, o[i++] = s3;
         }
         clean(...toClean);
-        return validatePCKS(out, pcks5);
+        return validatePCKS(dst, pcks5);
       }
     };
   });
-  var cbc = wrapCipher({ blockSize: 16, nonceLength: 16 }, function cbc2(key, iv, opts = {}) {
-    bytes(key);
-    bytes(iv, 16);
+  var cbc = /* @__PURE__ */ wrapCipher({ blockSize: 16, nonceLength: 16 }, function aescbc(key, iv, opts = {}) {
     const pcks5 = !opts.disablePadding;
     return {
       encrypt(plaintext, dst) {
@@ -1147,11 +1544,12 @@ var nobleCiphers = (() => {
         if (!isAligned32(_iv))
           toClean.push(_iv = copyBytes(_iv));
         const n32 = u32(_iv);
-        const out = getDst(ciphertext.length, dst);
+        dst = getOutput(ciphertext.length, dst);
         if (!isAligned32(ciphertext))
           toClean.push(ciphertext = copyBytes(ciphertext));
+        complexOverlapBytes(ciphertext, dst);
         const b = u32(ciphertext);
-        const o = u32(out);
+        const o = u32(dst);
         let s0 = n32[0], s1 = n32[1], s2 = n32[2], s3 = n32[3];
         for (let i = 0; i + 4 <= b.length; ) {
           const ps0 = s0, ps1 = s1, ps2 = s2, ps3 = s3;
@@ -1160,51 +1558,8 @@ var nobleCiphers = (() => {
           o[i++] = o0 ^ ps0, o[i++] = o1 ^ ps1, o[i++] = o2 ^ ps2, o[i++] = o3 ^ ps3;
         }
         clean(...toClean);
-        return validatePCKS(out, pcks5);
+        return validatePCKS(dst, pcks5);
       }
-    };
-  });
-  var cfb = wrapCipher({ blockSize: 16, nonceLength: 16 }, function cfb2(key, iv) {
-    bytes(key);
-    bytes(iv, 16);
-    function processCfb(src, isEncrypt, dst) {
-      bytes(src);
-      const srcLen = src.length;
-      dst = getDst(srcLen, dst);
-      const xk = expandKeyLE(key);
-      let _iv = iv;
-      const toClean = [xk];
-      if (!isAligned32(_iv))
-        toClean.push(_iv = copyBytes(_iv));
-      if (!isAligned32(src))
-        toClean.push(src = copyBytes(src));
-      const src32 = u32(src);
-      const dst32 = u32(dst);
-      const next32 = isEncrypt ? dst32 : src32;
-      const n32 = u32(_iv);
-      let s0 = n32[0], s1 = n32[1], s2 = n32[2], s3 = n32[3];
-      for (let i = 0; i + 4 <= src32.length; ) {
-        const { s0: e0, s1: e1, s2: e2, s3: e3 } = encrypt(xk, s0, s1, s2, s3);
-        dst32[i + 0] = src32[i + 0] ^ e0;
-        dst32[i + 1] = src32[i + 1] ^ e1;
-        dst32[i + 2] = src32[i + 2] ^ e2;
-        dst32[i + 3] = src32[i + 3] ^ e3;
-        s0 = next32[i++], s1 = next32[i++], s2 = next32[i++], s3 = next32[i++];
-      }
-      const start = BLOCK_SIZE2 * Math.floor(src32.length / BLOCK_SIZE32);
-      if (start < srcLen) {
-        ({ s0, s1, s2, s3 } = encrypt(xk, s0, s1, s2, s3));
-        const buf = u8(new Uint32Array([s0, s1, s2, s3]));
-        for (let i = start, pos = 0; i < srcLen; i++, pos++)
-          dst[i] = src[i] ^ buf[pos];
-        clean(buf);
-      }
-      clean(...toClean);
-      return dst;
-    }
-    return {
-      encrypt: (plaintext, dst) => processCfb(plaintext, true, dst),
-      decrypt: (ciphertext, dst) => processCfb(ciphertext, false, dst)
     };
   });
   function computeTag2(fn, isLE2, key, data, AAD) {
@@ -1223,11 +1578,7 @@ var nobleCiphers = (() => {
     clean(num);
     return res;
   }
-  var gcm = wrapCipher({ blockSize: 16, nonceLength: 12, tagLength: 16 }, function gcm2(key, nonce, AAD) {
-    bytes(key);
-    bytes(nonce);
-    if (AAD !== void 0)
-      bytes(AAD);
+  var gcm = /* @__PURE__ */ wrapCipher({ blockSize: 16, nonceLength: 12, tagLength: 16, varSizeNonce: true }, function aesgcm(key, nonce, AAD) {
     if (nonce.length < 8)
       throw new Error("aes/gcm: invalid nonce length");
     const tagLength = 16;
@@ -1257,13 +1608,12 @@ var nobleCiphers = (() => {
     }
     return {
       encrypt(plaintext) {
-        bytes(plaintext);
         const { xk, authKey, counter, tagMask } = deriveKeys();
         const out = new Uint8Array(plaintext.length + tagLength);
         const toClean = [xk, authKey, counter, tagMask];
         if (!isAligned32(plaintext))
           toClean.push(plaintext = copyBytes(plaintext));
-        ctr32(xk, false, counter, plaintext, out);
+        ctr32(xk, false, counter, plaintext, out.subarray(0, plaintext.length));
         const tag = _computeTag(authKey, tagMask, out.subarray(0, out.length - tagLength));
         toClean.push(tag);
         out.set(tag, plaintext.length);
@@ -1271,9 +1621,6 @@ var nobleCiphers = (() => {
         return out;
       },
       decrypt(ciphertext) {
-        bytes(ciphertext);
-        if (ciphertext.length < tagLength)
-          throw new Error(`aes/gcm: ciphertext less than tagLen (${tagLength})`);
         const { xk, authKey, counter, tagMask } = deriveKeys();
         const toClean = [xk, authKey, tagMask, counter];
         if (!isAligned32(ciphertext))
@@ -1291,22 +1638,21 @@ var nobleCiphers = (() => {
     };
   });
   var limit = (name, min, max) => (value) => {
-    if (!Number.isSafeInteger(value) || min > value || value > max)
-      throw new Error(`${name}: invalid value=${value}, must be [${min}..${max}]`);
+    if (!Number.isSafeInteger(value) || min > value || value > max) {
+      const minmax = "[" + min + ".." + max + "]";
+      throw new Error("" + name + ": expected value in range " + minmax + ", got " + value);
+    }
   };
-  var siv = wrapCipher({ blockSize: 16, nonceLength: 12, tagLength: 16 }, function siv2(key, nonce, AAD) {
+  var siv = /* @__PURE__ */ wrapCipher({ blockSize: 16, nonceLength: 12, tagLength: 16, varSizeNonce: true }, function aessiv(key, nonce, AAD) {
     const tagLength = 16;
     const AAD_LIMIT = limit("AAD", 0, 2 ** 36);
     const PLAIN_LIMIT = limit("plaintext", 0, 2 ** 36);
     const NONCE_LIMIT = limit("nonce", 12, 12);
     const CIPHER_LIMIT = limit("ciphertext", 16, 2 ** 36 + 16);
-    bytes(key, 16, 24, 32);
-    bytes(nonce);
+    abytes(key, 16, 24, 32);
     NONCE_LIMIT(nonce.length);
-    if (AAD !== void 0) {
-      bytes(AAD);
+    if (AAD !== void 0)
       AAD_LIMIT(AAD.length);
-    }
     function deriveKeys() {
       const xk = expandKeyLE(key);
       const encKey = new Uint8Array(key.length);
@@ -1351,7 +1697,6 @@ var nobleCiphers = (() => {
     }
     return {
       encrypt(plaintext) {
-        bytes(plaintext);
         PLAIN_LIMIT(plaintext.length);
         const { encKey, authKey } = deriveKeys();
         const tag = _computeTag(encKey, authKey, plaintext);
@@ -1365,7 +1710,6 @@ var nobleCiphers = (() => {
         return out;
       },
       decrypt(ciphertext) {
-        bytes(ciphertext);
         CIPHER_LIMIT(ciphertext.length);
         const tag = ciphertext.subarray(-tagLength);
         const { encKey, authKey } = deriveKeys();
@@ -1385,10 +1729,10 @@ var nobleCiphers = (() => {
     };
   });
   function isBytes32(a) {
-    return a != null && typeof a === "object" && (a instanceof Uint32Array || a.constructor.name === "Uint32Array");
+    return a instanceof Uint32Array || ArrayBuffer.isView(a) && a.constructor.name === "Uint32Array";
   }
   function encryptBlock(xk, block) {
-    bytes(block, 16);
+    abytes(block, 16);
     if (!isBytes32(xk))
       throw new Error("_encryptBlock accepts result of expandKeyLE");
     const b32 = u32(block);
@@ -1397,7 +1741,7 @@ var nobleCiphers = (() => {
     return block;
   }
   function decryptBlock(xk, block) {
-    bytes(block, 16);
+    abytes(block, 16);
     if (!isBytes32(xk))
       throw new Error("_decryptBlock accepts result of expandKeyLE");
     const b32 = u32(block);
@@ -1431,10 +1775,10 @@ var nobleCiphers = (() => {
       else {
         const o32 = u32(out);
         let a0 = o32[0], a1 = o32[1];
-        for (let j = 0, ctr4 = 1; j < 6; j++) {
-          for (let pos = 2; pos < o32.length; pos += 2, ctr4++) {
+        for (let j = 0, ctr2 = 1; j < 6; j++) {
+          for (let pos = 2; pos < o32.length; pos += 2, ctr2++) {
             const { s0, s1, s2, s3 } = encrypt(xk, a0, a1, o32[pos], o32[pos + 1]);
-            a0 = s0, a1 = s1 ^ byteSwap(ctr4), o32[pos] = s2, o32[pos + 1] = s3;
+            a0 = s0, a1 = s1 ^ byteSwap(ctr2), o32[pos] = s2, o32[pos + 1] = s3;
           }
         }
         o32[0] = a0, o32[1] = a1;
@@ -1451,9 +1795,9 @@ var nobleCiphers = (() => {
       else {
         const o32 = u32(out);
         let a0 = o32[0], a1 = o32[1];
-        for (let j = 0, ctr4 = chunks * 6; j < 6; j++) {
-          for (let pos = chunks * 2; pos >= 1; pos -= 2, ctr4--) {
-            a1 ^= byteSwap(ctr4);
+        for (let j = 0, ctr2 = chunks * 6; j < 6; j++) {
+          for (let pos = chunks * 2; pos >= 1; pos -= 2, ctr2--) {
+            a1 ^= byteSwap(ctr2);
             const { s0, s1, s2, s3 } = decrypt(xk, a0, a1, o32[pos], o32[pos + 1]);
             a0 = s0, a1 = s1, o32[pos] = s2, o32[pos + 1] = s3;
           }
@@ -1463,10 +1807,9 @@ var nobleCiphers = (() => {
       xk.fill(0);
     }
   };
-  var AESKW_IV = new Uint8Array(8).fill(166);
-  var aeskw = wrapCipher({ blockSize: 8 }, (kek) => ({
+  var AESKW_IV = /* @__PURE__ */ new Uint8Array(8).fill(166);
+  var aeskw = /* @__PURE__ */ wrapCipher({ blockSize: 8 }, (kek) => ({
     encrypt(plaintext) {
-      bytes(plaintext);
       if (!plaintext.length || plaintext.length % 8 !== 0)
         throw new Error("invalid plaintext length");
       if (plaintext.length === 8)
@@ -1476,7 +1819,6 @@ var nobleCiphers = (() => {
       return out;
     },
     decrypt(ciphertext) {
-      bytes(ciphertext);
       if (ciphertext.length % 8 !== 0 || ciphertext.length < 3 * 8)
         throw new Error("invalid ciphertext length");
       const out = copyBytes(ciphertext);
@@ -1488,9 +1830,8 @@ var nobleCiphers = (() => {
     }
   }));
   var AESKWP_IV = 2790873510;
-  var aeskwp = wrapCipher({ blockSize: 8 }, (kek) => ({
+  var aeskwp = /* @__PURE__ */ wrapCipher({ blockSize: 8 }, (kek) => ({
     encrypt(plaintext) {
-      bytes(plaintext);
       if (!plaintext.length)
         throw new Error("invalid plaintext length");
       const padded = Math.ceil(plaintext.length / 8) * 8;
@@ -1503,7 +1844,6 @@ var nobleCiphers = (() => {
       return out;
     },
     decrypt(ciphertext) {
-      bytes(ciphertext);
       if (ciphertext.length < 16)
         throw new Error("invalid ciphertext length");
       const out = copyBytes(ciphertext);
@@ -1521,10 +1861,10 @@ var nobleCiphers = (() => {
     }
   }));
 
-  // ../src/crypto.ts
+  // ../../src/crypto.ts
   var crypto = typeof globalThis === "object" && "crypto" in globalThis ? globalThis.crypto : void 0;
 
-  // ../esm/webcrypto.js
+  // ../../esm/webcrypto.js
   function randomBytes(bytesLength = 32) {
     if (crypto && typeof crypto.getRandomValues === "function") {
       return crypto.getRandomValues(new Uint8Array(bytesLength));
@@ -1534,68 +1874,9 @@ var nobleCiphers = (() => {
     }
     throw new Error("crypto.getRandomValues must be defined");
   }
-  function getWebcryptoSubtle() {
-    if (crypto && typeof crypto.subtle === "object" && crypto.subtle != null)
-      return crypto.subtle;
-    throw new Error("crypto.subtle must be defined");
-  }
-  var utils = {
-    async encrypt(key, keyParams, cryptParams, plaintext) {
-      const cr = getWebcryptoSubtle();
-      const iKey = await cr.importKey("raw", key, keyParams, true, ["encrypt"]);
-      const ciphertext = await cr.encrypt(cryptParams, iKey, plaintext);
-      return new Uint8Array(ciphertext);
-    },
-    async decrypt(key, keyParams, cryptParams, ciphertext) {
-      const cr = getWebcryptoSubtle();
-      const iKey = await cr.importKey("raw", key, keyParams, true, ["decrypt"]);
-      const plaintext = await cr.decrypt(cryptParams, iKey, ciphertext);
-      return new Uint8Array(plaintext);
-    }
-  };
-  var mode = {
-    CBC: "AES-CBC",
-    CTR: "AES-CTR",
-    GCM: "AES-GCM"
-  };
-  function getCryptParams(algo, nonce, AAD) {
-    if (algo === mode.CBC)
-      return { name: mode.CBC, iv: nonce };
-    if (algo === mode.CTR)
-      return { name: mode.CTR, counter: nonce, length: 64 };
-    if (algo === mode.GCM) {
-      if (AAD)
-        return { name: mode.GCM, iv: nonce, additionalData: AAD };
-      else
-        return { name: mode.GCM, iv: nonce };
-    }
-    throw new Error("unknown aes block mode");
-  }
-  function generate(algo) {
-    return (key, nonce, AAD) => {
-      bytes(key);
-      bytes(nonce);
-      const keyParams = { name: algo, length: key.length * 8 };
-      const cryptParams = getCryptParams(algo, nonce, AAD);
-      return {
-        // keyLength,
-        encrypt(plaintext) {
-          bytes(plaintext);
-          return utils.encrypt(key, keyParams, cryptParams, plaintext);
-        },
-        decrypt(ciphertext) {
-          bytes(ciphertext);
-          return utils.decrypt(key, keyParams, cryptParams, ciphertext);
-        }
-      };
-    };
-  }
-  var cbc3 = generate(mode.CBC);
-  var ctr3 = generate(mode.CTR);
-  var gcm3 = generate(mode.GCM);
 
   // input.js
-  var utils2 = { bytesToHex, bytesToUtf8, hexToBytes, randomBytes, utf8ToBytes };
+  var utils = { bytesToHex, bytesToUtf8, hexToBytes, randomBytes, utf8ToBytes };
   return __toCommonJS(input_exports);
 })();
 /*! noble-ciphers - MIT License (c) 2023 Paul Miller (paulmillr.com) */
